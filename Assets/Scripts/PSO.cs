@@ -20,8 +20,6 @@ public class PSO : IOptimizer
 
             for (int i = 0; i < stationNum; i++)
             {
-                pos.Add(new Vector2(Random.Range(-areaL / 2f, areaL / 2f),
-                                    Random.Range(-areaW / 2f, areaW / 2f)));
                 vel.Add(Vector2.zero);
             }
 
@@ -47,7 +45,7 @@ public class PSO : IOptimizer
     // =====================================================
     // Init
     // =====================================================
-    public void Initialize(int populationSize, int stationNum, int areaL, int areaW, float radius, float w, float c1, float c2, int maxIterations)
+    public void Initialize(int populationSize, int stationNum, List<Vector2> initialPositions, int areaL, int areaW, float radius, float w, float c1, float c2, int maxIterations)
     {
         this.populationSize = populationSize;
         this.stationNum = stationNum;
@@ -66,6 +64,7 @@ public class PSO : IOptimizer
         for (int i = 0; i < populationSize; i++)
         {
             var p = new Particle(stationNum, areaL, areaW);
+            p.pos = initialPositions;
             Evaluate(p);
             population.Add(p);
         }

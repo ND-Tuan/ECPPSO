@@ -28,8 +28,6 @@ public class ECPPSO : IOptimizer
 
             for (int i = 0; i < stationNum; i++)
             {
-                pos.Add(new Vector2(Random.Range(-areaL / 2f, areaL / 2f),
-                                    Random.Range(-areaW / 2f, areaW / 2f)));
                 vel.Add(Vector2.zero);
                 u.Add(Vector2.zero);
             }
@@ -60,7 +58,7 @@ public class ECPPSO : IOptimizer
     // =====================================================
     // Init
     // =====================================================
-    public void Initialize(int populationSize, int stationNum, int areaL, int areaW, float radius, float w, float c1, float c2, int maxIterations)
+    public void Initialize(int populationSize, int stationNum, List<Vector2> initialPositions, int areaL, int areaW, float radius, float w, float c1, float c2, int maxIterations)
     {
 
         this.populationSize = populationSize;
@@ -80,6 +78,7 @@ public class ECPPSO : IOptimizer
         for (int i = 0; i < populationSize; i++)
         {
             var p = new Particle(stationNum, areaL, areaW);
+            p.pos = initialPositions;
             Evaluate(p);
             p.pBest = new List<Vector2>(p.pos);
             p.pBestFitness = p.fitness;
@@ -238,61 +237,61 @@ public class ECPPSO : IOptimizer
         }
     }
 
-    /// <summary>
-    /// Apply GA: create children from elites and replace worst ones.
-    /// Assumes population is sorted descending by fitness (best first).
-    /// </summary>
     private void ApplyGeneticEvolution()
     {
+        // Kiểm tra tính hợp lệ của quần thể
         if (population == null || population.Count == 0) return;
 
+        // Tính số lượng cá thể yếu cần thay thế (G% bottom)
         int Gcount = Mathf.Max(1, populationSize * G_percent / 100);
+        
+        // Tính số lượng cá thể ưu tú để làm cha mẹ
         int eliteCount = Mathf.Max(2, Mathf.CeilToInt(populationSize * eliteFrac));
         eliteCount = Mathf.Min(eliteCount, population.Count);
 
-        // parents from top elites (population should be sorted descending before calling)
+        // Lấy các cá thể ưu tú từ đầu quần thể (phải được sắp xếp giảm dần trước khi gọi)
         var elites = population.Take(eliteCount).ToList();
 
-        // create replaceCount children and replace bottom Gcount particles
+        // Tạo con cái và thay thế G% cá thể yếu nhất
         for (int i = 0; i < Gcount; i++)
         {
-            // select two random parents from elites
+            // Chọn ngẫu nhiên hai cha mẹ từ nhóm ưu tú
             var parentA = elites[Random.Range(0, eliteCount)];
             var parentB = elites[Random.Range(0, eliteCount)];
 
-            // crossover using parents' pBest (use pBest to bias towards good positions)
+            // Lai ghép đồng nhất sử dụng pBest của cha mẹ (thiên về vị trí tốt)
             List<Vector2> childPos = CrossoverUniform(parentA.pBest, parentB.pBest);
 
-            // mutation
+            // Đột biến vị trí con cái
             MutatePositions(childPos);
 
-            // build child particle (reuse Particle constructor then overwrite pos/vel/u/pBest)
+            // Tạo hạt con mới (sử dụng lại constructor rồi ghi đè pos/vel/u/pBest)
             var child = new Particle(stationNum, areaL, areaW);
 
-            // replace child's pos with generated childPos
+            // Thay thế vị trí con với vị trí được sinh ra
             child.pos = new List<Vector2>(childPos);
 
-            // reset vel and u to zero (start fresh)
+            // Reset vận tốc và vector dự đoán về 0 (bắt đầu mới)
             for (int j = 0; j < stationNum; j++)
             {
                 child.vel[j] = Vector2.zero;
                 child.u[j] = Vector2.zero;
             }
 
-            // set pBest initial to child's pos (so child can evaluate from this state)
+            // Đặt pBest ban đầu bằng vị trí hiện tại của con
             child.pBest = new List<Vector2>(child.pos);
             child.pBestFitness = -1f;
 
-            // evaluate child
+            // Đánh giá fitness của con cái
             Evaluate(child);
 
-            // put child into population replacing the worst (bottom) ones
-            int replaceIndex = population.Count - 1 - i; // bottom-most, i=0 worst
+            // Đặt con vào quần thể, thay thế những cá thể yếu nhất (cuối bảng)
+            int replaceIndex = population.Count - 1 - i; // vị trí cuối, i=0 là yếu nhất
             if (replaceIndex >= 0 && replaceIndex < population.Count)
                 population[replaceIndex] = child;
         }
 
-        // After replacement, re-sort population (best first)
+        // Sau khi thay thế, sắp xếp lại quần thể (tốt nhất trước)
         population = population.OrderByDescending(p => p.fitness).ToList();
     }
 

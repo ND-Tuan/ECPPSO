@@ -63,7 +63,7 @@ public class Controller : MonoBehaviour
                 break;
         }
 
-        optimizer.Initialize(populationSize, station_num, areaL, areaW, stationRadius, w, c1, c2, maxIterations);
+        optimizer.Initialize(populationSize, station_num, InitialPositions, areaL, areaW, stationRadius, w, c1, c2, maxIterations);
 
         if (optimizerType == OptimizerType.ECPPSO)
         {
