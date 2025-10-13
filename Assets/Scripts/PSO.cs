@@ -5,28 +5,6 @@ using System.Collections;
 
 public class PSO : IOptimizer
 {
-    private class Particle
-    {
-        public List<Vector2> pos;
-        public List<Vector2> vel;
-        public List<Vector2> pBest;
-        public float fitness;
-        public float pBestFitness;
-
-        public Particle(int stationNum, int areaL, int areaW)
-        {
-            pos = new List<Vector2>();
-            vel = new List<Vector2>();
-
-            for (int i = 0; i < stationNum; i++)
-            {
-                vel.Add(Vector2.zero);
-            }
-
-            pBest = new List<Vector2>(pos);
-            pBestFitness = -1f;
-        }
-    }
 
     private int areaL, areaW;
     private float radius, r2;
@@ -41,88 +19,68 @@ public class PSO : IOptimizer
     private int maxIterations = 200;
 
     private float vmax; // giới hạn vận tốc
+    private List<List<Vector2>> initialPositions = new List<List<Vector2>>();
 
     // =====================================================
     // Init
     // =====================================================
-    public void Initialize(int populationSize, int stationNum, List<Vector2> initialPositions, int areaL, int areaW, float radius, float w, float c1, float c2, int maxIterations)
+    public void Initialize()
     {
-        this.populationSize = populationSize;
-        this.stationNum = stationNum;
-        this.areaL = areaL;
-        this.areaW = areaW;
-        this.radius = radius;
+        //Load giá trị từ Controller
+        populationSize  = Controller.Instance.populationSize;
+        stationNum      = Controller.Instance.station_num;
+        areaL           = Controller.Instance.areaL;
+        areaW           = Controller.Instance.areaW;
+        radius          = Controller.Instance.stationRadius;
+        w               = Controller.Instance.w;
+        c1              = Controller.Instance.c1;
+        c2              = Controller.Instance.c2;
+        maxIterations   = Controller.Instance.maxIterations;
+
         r2 = radius * radius;
-        vmax = radius; // tốc độ tối đa = bán kính phủ
+        vmax = radius;
 
-        this.w = w;
-        this.c1 = c1;
-        this.c2 = c2;
-        this.maxIterations = maxIterations;
+        //  Load/Gen vị trí ban đầu
+        if (Controller.Instance.testType == Controller.TestType.LoadInit)
+            initialPositions = Controller.Instance.LoadInitial();
+        else
+            initialPositions.Clear();
 
+        // Tạo quần thể
         population = new List<Particle>();
         for (int i = 0; i < populationSize; i++)
         {
-            var p = new Particle(stationNum, areaL, areaW);
-            p.pos = initialPositions;
-            Evaluate(p);
+            // Tạo cá thể mới
+            var p = new Particle(stationNum);
+
+            // Gán vị trí ban đầu
+            if (Controller.Instance.testType == Controller.TestType.LoadInit)
+                p.pos = initialPositions[i];
+            else
+            {
+                for (int j = 0; j < stationNum; j++)
+                    p.pos.Add(new Vector2(Random.Range(-areaL / 2f, areaL / 2f), Random.Range(-areaW / 2f, areaW / 2f)));
+
+                initialPositions.Add(p.pos);
+            }
+
+            // Đánh giá fitness ban đầu
+            Controller.Instance.Evaluate(p);
+            p.pBest = new List<Vector2>(p.pos);
+            p.pBestFitness = p.fitness;
             population.Add(p);
         }
 
+        Controller.Instance.SetStationPositions(population[0].pos);
+
+        // Xếp hạng quần thể và chọn gBest
         gBest = population.OrderByDescending(p => p.fitness).First();
-        globalBestFitness = gBest.fitness;
+        
+        // Lưu vị trí ban đầu nếu là RandomInit
+        if (Controller.Instance.testType == Controller.TestType.RandomInit && Controller.Instance.AutoSaveInitial)
+            Controller.Instance.SaveInitial(initialPositions);
     }
 
-    // =====================================================
-    // Evaluate coverage fitness
-    // =====================================================
-    private void Evaluate(Particle p)
-    {
-        int total = areaL * areaW;
-        BitArray coveredBits = new BitArray(total); // mỗi bit = 1 sample
-        int coveredCount = 0;
-
-        float offsetX = -areaL / 2f;
-        float offsetY = -areaW / 2f;
-        float r2 = radius * radius;
-
-        // Duyệt từng trạm
-        foreach (var s in p.pos)
-        {
-            // Giới hạn vùng ảnh hưởng trạm
-            int xMin = Mathf.Max(0, Mathf.FloorToInt(s.x - radius - offsetX));
-            int xMax = Mathf.Min(areaL - 1, Mathf.CeilToInt(s.x + radius - offsetX));
-            int yMin = Mathf.Max(0, Mathf.FloorToInt(s.y - radius - offsetY));
-            int yMax = Mathf.Min(areaW - 1, Mathf.CeilToInt(s.y + radius - offsetY));
-
-            for (int y = yMin; y <= yMax; y++)
-            {
-                for (int x = xMin; x <= xMax; x++)
-                {
-                    int index = y * areaL + x; // vị trí bit tương ứng với sample (x,y)
-                    if (coveredBits[index]) continue; // ✅ skip nếu đã phủ
-
-                    Vector2 sample = new Vector2(offsetX + x + 0.5f, offsetY + y + 0.5f);
-
-                    if ((s - sample).sqrMagnitude <= r2)
-                    {
-                        coveredBits[index] = true;
-                        coveredCount++;
-                    }
-                }
-            }
-        }
-
-        // coverage %
-        p.fitness = (float)coveredCount / total;
-
-        // cập nhật pBest nếu tốt hơn
-        if (p.fitness > p.pBestFitness)
-        {
-            p.pBestFitness = p.fitness;
-            p.pBest = new List<Vector2>(p.pos);
-        }
-    }
 
     // =====================================================
     // Run iteration
@@ -163,8 +121,10 @@ public class PSO : IOptimizer
                 p.pos[i] = newPos;
             }
 
-            Evaluate(p);
+            Controller.Instance.Evaluate(p);
         }
+
+        if (Controller.Instance.useGA) GA.ApplyGeneticEvolution(population);
 
         // ✅ update gBest toàn cục
         var candidate = population.OrderByDescending(p => p.fitness).First();

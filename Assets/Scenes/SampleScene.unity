@@ -235,9 +235,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 42e0c1e3717829f4ea66f27d47062b5f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  optimizerType: 1
+  optimizerType: 0
   testType: 0
-  filePath: Assets/Data/data1_S50.json
+  useGA: 0
+  AutoSaveInitial: 0
+  filePath: Assets/Data/S50/data1_S50.json
+  SaveResults: 0
+  fitnessFilePath: Assets/Data/S50/ECPPSO_Data.csv
   stationPrefab: {fileID: 5092163109252927539, guid: 5ccd067dcbd1cd04ea2b72c3550a006c, type: 3}
   areaL: 50
   areaW: 50
@@ -246,10 +250,13 @@ MonoBehaviour:
   populationSize: 50
   maxIterations: 500
   w: 0.4
-  c1: 2
-  c2: 2
+  c1: 0.7
+  c2: 0.7
   G_percent: 15
   neighborCount: 3
+  eliteFrac: 30
+  mutationRate: 0.05
+  mutationStep: 1
 --- !u!4 &83524794
 Transform:
   m_ObjectHideFlags: 0

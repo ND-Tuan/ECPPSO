@@ -3,39 +3,9 @@ using UnityEngine;
 using System.Linq;
 using System.Collections;
 
-/// <summary>
-/// ECPPSO + Genetic Evolution (crossover + mutation)
-/// - Dựa trên class ECPPSO bạn cung cấp; thêm GA step vào cuối mỗi iteration.
-/// - GA parameters: eliteFrac, mutationRate, mutationStep.
-/// - Children replace bottom G% (same G_percent used for SE group).
-/// </summary>
 public class ECPPSO : IOptimizer
 {
-    private class Particle
-    {
-        public List<Vector2> pos;
-        public List<Vector2> vel;
-        public List<Vector2> pBest;
-        public float fitness;
-        public float pBestFitness;
-        public List<Vector2> u; // vector dự đoán (Eq.6)
-
-        public Particle(int stationNum, int areaL, int areaW)
-        {
-            pos = new List<Vector2>();
-            vel = new List<Vector2>();
-            u = new List<Vector2>();
-
-            for (int i = 0; i < stationNum; i++)
-            {
-                vel.Add(Vector2.zero);
-                u.Add(Vector2.zero);
-            }
-
-            pBest = new List<Vector2>(pos);
-            pBestFitness = -1f;
-        }
-    }
+    
     private int areaL, areaW;
     private float radius, r2;
     private int stationNum;
@@ -51,109 +21,76 @@ public class ECPPSO : IOptimizer
     private int maxIterations;
 
     // GA params (tunable)
-    private float eliteFrac = 0.3f;      // top fraction used as parents
-    private float mutationRate = 0.05f;  // per-gene mutation probability
-    private float mutationStep = 1.0f;   // mutation displacement magnitude
+    private float eliteFrac = 0.3f;      
+    private float mutationRate = 0.05f; 
+    private float mutationStep = 1.0f;  
+
+    private List<List<Vector2>> initialPositions = new List<List<Vector2>>();
 
     // =====================================================
     // Init
     // =====================================================
-    public void Initialize(int populationSize, int stationNum, List<Vector2> initialPositions, int areaL, int areaW, float radius, float w, float c1, float c2, int maxIterations)
+    public void Initialize()
     {
+        //Load giá trị từ Controller
+        populationSize  = Controller.Instance.populationSize;
+        stationNum      = Controller.Instance.station_num;
+        areaL           = Controller.Instance.areaL;
+        areaW           = Controller.Instance.areaW;
+        radius          = Controller.Instance.stationRadius;
+        w               = Controller.Instance.w;
+        c1              = Controller.Instance.c1;
+        c2              = Controller.Instance.c2;
+        maxIterations   = Controller.Instance.maxIterations;
+        G_percent       = Controller.Instance.G_percent;
+        neighborCount   = Controller.Instance.neighborCount;
 
-        this.populationSize = populationSize;
-        this.stationNum = stationNum;
-        this.areaL = areaL;
-        this.areaW = areaW;
-        this.radius = radius;
+        eliteFrac       = Controller.Instance.eliteFrac / 100f;
+        mutationRate    = Controller.Instance.mutationRate;
+        mutationStep    = Controller.Instance.mutationStep;
+
         r2 = radius * radius;
 
-        this.w = w;
-        this.c1 = c1;
-        this.c2 = c2;
+        //  Load/Gen vị trí ban đầu
+        if (Controller.Instance.testType == Controller.TestType.LoadInit)
+            initialPositions = Controller.Instance.LoadInitial();
+        else
+            initialPositions.Clear();
 
-        this.maxIterations = maxIterations;
-
+        // Tạo quần thể
         population = new List<Particle>();
         for (int i = 0; i < populationSize; i++)
         {
-            var p = new Particle(stationNum, areaL, areaW);
-            p.pos = initialPositions;
-            Evaluate(p);
+            // Tạo cá thể mới
+            var p = new Particle(stationNum);
+
+            // Gán vị trí ban đầu
+            if (Controller.Instance.testType == Controller.TestType.LoadInit)
+                p.pos = initialPositions[i];
+            else
+            {
+                for (int j = 0; j < stationNum; j++)
+                    p.pos.Add(new Vector2(Random.Range(-areaL / 2f, areaL / 2f), Random.Range(-areaW / 2f, areaW / 2f)));
+
+                initialPositions.Add(p.pos);
+            }
+
+            // Đánh giá fitness ban đầu
+            Controller.Instance.Evaluate(p);
             p.pBest = new List<Vector2>(p.pos);
             p.pBestFitness = p.fitness;
             population.Add(p);
         }
+
+        Controller.Instance.SetStationPositions(population[0].pos);
+
+        // Xếp hạng quần thể và chọn gBest
         gBest = population.OrderByDescending(p => p.fitness).First();
+        
+        // Lưu vị trí ban đầu nếu là RandomInit
+        if (Controller.Instance.testType == Controller.TestType.RandomInit && Controller.Instance.AutoSaveInitial)
+            Controller.Instance.SaveInitial(initialPositions);
     }
-
-    public void SetParams(int G_percent, int neighborCount)
-    {
-        this.G_percent = G_percent;
-        this.neighborCount = neighborCount;
-    }
-
-    /// <summary>
-    /// Optional: expose GA tuning
-    /// </summary>
-    public void SetGAParams(float eliteFraction = 0.3f, float mutationRate = 0.05f, float mutationStep = 1.0f)
-    {
-        this.eliteFrac = Mathf.Clamp01(eliteFraction);
-        this.mutationRate = Mathf.Clamp01(mutationRate);
-        this.mutationStep = Mathf.Max(0f, mutationStep);
-    }
-
-    // =====================================================
-    // Evaluate coverage fitness
-    // =====================================================
-    private void Evaluate(Particle p)
-    {
-        int total = areaL * areaW;
-        BitArray coveredBits = new BitArray(total); // mỗi bit = 1 sample
-        int coveredCount = 0;
-
-        float offsetX = -areaL / 2f;
-        float offsetY = -areaW / 2f;
-        float r2 = radius * radius;
-
-        // Duyệt từng trạm
-        foreach (var s in p.pos)
-        {
-            // Giới hạn vùng ảnh hưởng trạm
-            int xMin = Mathf.Max(0, Mathf.FloorToInt(s.x - radius - offsetX));
-            int xMax = Mathf.Min(areaL - 1, Mathf.CeilToInt(s.x + radius - offsetX));
-            int yMin = Mathf.Max(0, Mathf.FloorToInt(s.y - radius - offsetY));
-            int yMax = Mathf.Min(areaW - 1, Mathf.CeilToInt(s.y + radius - offsetY));
-
-            for (int y = yMin; y <= yMax; y++)
-            {
-                for (int x = xMin; x <= xMax; x++)
-                {
-                    int index = y * areaL + x; // vị trí bit tương ứng với sample (x,y)
-                    if (coveredBits[index]) continue; // ✅ skip nếu đã phủ
-
-                    Vector2 sample = new Vector2(offsetX + x + 0.5f, offsetY + y + 0.5f);
-
-                    if ((s - sample).sqrMagnitude <= r2)
-                    {
-                        coveredBits[index] = true;
-                        coveredCount++;
-                    }
-                }
-            }
-        }
-
-        // coverage %
-        p.fitness = (float)coveredCount / total;
-
-        // cập nhật pBest nếu tốt hơn
-        if (p.fitness > p.pBestFitness)
-        {
-            p.pBestFitness = p.fitness;
-            p.pBest = new List<Vector2>(p.pos);
-        }
-    }
-
 
 
     // =====================================================
@@ -207,96 +144,7 @@ public class ECPPSO : IOptimizer
     }
 
     // =====================================================
-    // GA helpers: crossover + mutation
-    // =====================================================
-    private List<Vector2> CrossoverUniform(List<Vector2> A, List<Vector2> B)
-    {
-        List<Vector2> child = new List<Vector2>(A.Count);
-        for (int i = 0; i < A.Count; i++)
-        {
-            if (Random.value < 0.5f)
-                child.Add(A[i]);
-            else
-                child.Add(B[i]);
-        }
-        return child;
-    }
-
-    private void MutatePositions(List<Vector2> pos)
-    {
-        for (int i = 0; i < pos.Count; i++)
-        {
-            if (Random.value < mutationRate)
-            {
-                Vector2 delta = new Vector2(Random.Range(-mutationStep, mutationStep),
-                                            Random.Range(-mutationStep, mutationStep));
-                pos[i] += delta;
-                pos[i] = new Vector2(Mathf.Clamp(pos[i].x, -areaL / 2f, areaL / 2f),
-                                     Mathf.Clamp(pos[i].y, -areaW / 2f, areaW / 2f));
-            }
-        }
-    }
-
-    private void ApplyGeneticEvolution()
-    {
-        // Kiểm tra tính hợp lệ của quần thể
-        if (population == null || population.Count == 0) return;
-
-        // Tính số lượng cá thể yếu cần thay thế (G% bottom)
-        int Gcount = Mathf.Max(1, populationSize * G_percent / 100);
-        
-        // Tính số lượng cá thể ưu tú để làm cha mẹ
-        int eliteCount = Mathf.Max(2, Mathf.CeilToInt(populationSize * eliteFrac));
-        eliteCount = Mathf.Min(eliteCount, population.Count);
-
-        // Lấy các cá thể ưu tú từ đầu quần thể (phải được sắp xếp giảm dần trước khi gọi)
-        var elites = population.Take(eliteCount).ToList();
-
-        // Tạo con cái và thay thế G% cá thể yếu nhất
-        for (int i = 0; i < Gcount; i++)
-        {
-            // Chọn ngẫu nhiên hai cha mẹ từ nhóm ưu tú
-            var parentA = elites[Random.Range(0, eliteCount)];
-            var parentB = elites[Random.Range(0, eliteCount)];
-
-            // Lai ghép đồng nhất sử dụng pBest của cha mẹ (thiên về vị trí tốt)
-            List<Vector2> childPos = CrossoverUniform(parentA.pBest, parentB.pBest);
-
-            // Đột biến vị trí con cái
-            MutatePositions(childPos);
-
-            // Tạo hạt con mới (sử dụng lại constructor rồi ghi đè pos/vel/u/pBest)
-            var child = new Particle(stationNum, areaL, areaW);
-
-            // Thay thế vị trí con với vị trí được sinh ra
-            child.pos = new List<Vector2>(childPos);
-
-            // Reset vận tốc và vector dự đoán về 0 (bắt đầu mới)
-            for (int j = 0; j < stationNum; j++)
-            {
-                child.vel[j] = Vector2.zero;
-                child.u[j] = Vector2.zero;
-            }
-
-            // Đặt pBest ban đầu bằng vị trí hiện tại của con
-            child.pBest = new List<Vector2>(child.pos);
-            child.pBestFitness = -1f;
-
-            // Đánh giá fitness của con cái
-            Evaluate(child);
-
-            // Đặt con vào quần thể, thay thế những cá thể yếu nhất (cuối bảng)
-            int replaceIndex = population.Count - 1 - i; // vị trí cuối, i=0 là yếu nhất
-            if (replaceIndex >= 0 && replaceIndex < population.Count)
-                population[replaceIndex] = child;
-        }
-
-        // Sau khi thay thế, sắp xếp lại quần thể (tốt nhất trước)
-        population = population.OrderByDescending(p => p.fitness).ToList();
-    }
-
-    // =====================================================
-    // Run iteration
+    // Chạy vòng lặp
     // =====================================================
     public void RunIteration()
     {
@@ -340,14 +188,14 @@ public class ECPPSO : IOptimizer
 
                 Vector2 newPos = p.pos[i] + p.vel[i];
 
-               
+
                 if (newPos.x > areaL / 2f || newPos.x < -areaL / 2f)
                 {
                     Vector2 vel = p.vel[i];
                     vel.x *= -0.5f;
                     p.vel[i] = vel;
                     newPos.x = Mathf.Clamp(newPos.x, -areaL / 2f, areaL / 2f);
-                    
+
                 }
                 if (newPos.y > areaW / 2f || newPos.y < -areaW / 2f)
                 {
@@ -360,13 +208,10 @@ public class ECPPSO : IOptimizer
                 p.pos[i] = newPos;
             }
 
-            Evaluate(p);
+            Controller.Instance.Evaluate(p);
         }
 
-        // --- GA evolution step: create children from elites and replace bottom G% ---
-        // population is currently evaluated; GA will replace worst particles.
-        // Note: after ApplyGeneticEvolution we will re-sort and then update gBest below.
-        ApplyGeneticEvolution();
+        if (Controller.Instance.useGA) GA.ApplyGeneticEvolution(population);
 
         // giữ gBest toàn cục (best-so-far)
         var candidate = population.OrderByDescending(p => p.fitness).First();
