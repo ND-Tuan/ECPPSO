@@ -12,9 +12,13 @@ public class Controller : MonoBehaviour
     public enum TestType { RandomInit, LoadInit }
 
     [Header("General Settings")]
+    public bool useObstacles = false;
+
     public OptimizerType optimizerType;
     public TestType testType;
     public bool useGA = true;
+    public bool useSE = true;
+    public bool useNEP = true;
 
     public bool AutoSaveInitial = true;
     public string filePath;
@@ -52,10 +56,27 @@ public class Controller : MonoBehaviour
     public int neighborCount = 3;
 
     [Header("GA params")]
-    [Range(0, 100)] public int eliteFrac = 30;      //% cá thể ưu tú làm cha mẹ
+    [Range(0, 100)] public int E_percent = 30;      //% cá thể ưu tú làm cha mẹ
     [Range(0, 1)] public float mutationRate = 0.05f;  // xác suất đột biến
     [Range(0, 10)] public float mutationStep = 1.0f;   // độ dịch chuyển đột biến
 
+    [Header("Obstacle Polygons")]
+    public GameObject obstaclePolygonPrefab;
+    public int obstacleCount = 8;
+    public Vector2 vertexRange = new Vector2(3, 8);
+    public Vector2 radiusRange = new Vector2(2f, 6f);
+    public List<ObstaclePolygon> Obstacles = new List<ObstaclePolygon>();
+
+
+    //List
+    private List<float> PSO_FitnessValues = new List<float>();
+    private List<float> ECPPSO_FitnessValues = new List<float>();
+    private List<float> PSO_GA_FitnessValues = new List<float>();
+    private List<float> ECPPSO_GA_FitnessValues = new List<float>();
+    private List<float> ECPPSO_SE_GA_FitnessValues = new List<float>();
+    private List<float> ECPPSO_NEP_GA_FitnessValues = new List<float>();
+
+    // Singleton instance
     public static Controller Instance;
 
     private void Awake()
@@ -72,7 +93,10 @@ public class Controller : MonoBehaviour
         UI.Instance.GenMap(areaL, areaW);
         UI.Instance.GenGraph(maxIterations);
 
+        if (useObstacles)  GenObstacles();
+
         GenStations();
+        
 
         switch (optimizerType)
         {
@@ -87,6 +111,8 @@ public class Controller : MonoBehaviour
         optimizer.Initialize();
 
         StartCoroutine(RunOptimization()); 
+
+        //StartCoroutine(SetUp());
 
     }
 
@@ -129,6 +155,7 @@ public class Controller : MonoBehaviour
 
         if (SaveResults) SaveFitnessValues(FitnessValuesList);
 
+
         Debug.Log($"Best Coverage = {bestCoverage:F4}% in iteration {bestIter}");
 
     }
@@ -151,6 +178,34 @@ public class Controller : MonoBehaviour
             station.Initialize(pos, stationRadius);
             Stations_List.Add(station);
         }
+    }
+
+    public void GenObstacles()
+    {
+        foreach (var o in Obstacles)
+        {
+            if (o != null) Destroy(o.gameObject);
+        }
+        Obstacles.Clear();
+
+        for (int i = 0; i < obstacleCount; i++)
+        {
+            Vector2 center = new Vector2(
+                UnityEngine.Random.Range(-areaL / 2f, areaL / 2f),
+                UnityEngine.Random.Range(-areaW / 2f, areaW / 2f)
+            );
+
+            int vCount = UnityEngine.Random.Range((int)vertexRange.x, (int)vertexRange.y + 1);
+            float minR = radiusRange.x;
+            float maxR = radiusRange.y;
+
+            var obj = Instantiate(obstaclePolygonPrefab, transform);
+            var ob = obj.GetComponent<ObstaclePolygon>();
+            ob.Initialize(center, vCount, minR, maxR);
+            Obstacles.Add(ob);
+        }
+
+        Debug.Log($"Tạo {Obstacles.Count} vật cản đa giác thành công!");
     }
 
     public void DisplayInfoGraph(float iter)
@@ -189,6 +244,17 @@ public class Controller : MonoBehaviour
                     if (coveredBits[index]) continue; // skip nếu đã phủ
 
                     Vector2 sample = new Vector2(offsetX + x + 0.5f, offsetY + y + 0.5f);
+
+                    bool blocked = false;
+                    foreach (var ob in Obstacles)
+                    {
+                        if (ob.Contains(sample))
+                        {
+                            blocked = true;
+                            break;
+                        }
+                    }
+                    if (blocked) continue;
 
                     if ((s - sample).sqrMagnitude <= r2)
                     {
@@ -283,11 +349,172 @@ public class Controller : MonoBehaviour
         {
             File.Delete(fitnessFilePath);
         }
-        
+
         string csvContent = "Iteration,Fitness\n";
         for (int i = 0; i < list.Count; i++)
         {
             csvContent += $"{i + 1},{list[i]:F4}\n";
+        }
+        File.WriteAllText(fitnessFilePath, csvContent);
+    }
+
+
+
+
+
+
+    private IEnumerator SetUp()
+    {
+        //PSO
+        c1 = 2f;
+        c2 = 2f;
+        useGA = false;
+        optimizer = new PSO();
+        optimizer.Initialize();
+
+        isOptimizing = true;
+
+        UI.Instance.GenNewLine("PSO");
+
+        StartCoroutine(RunOptimization());
+
+        yield return new WaitUntil(() => isOptimizing == false);
+
+        PSO_FitnessValues = new List<float>(FitnessValuesList);
+        FitnessValuesList.Clear();
+        LineGraphPoints.Clear();
+        SolutionsList.Clear();
+
+
+
+        //ECPPSO
+        c1 = 2.0f;
+        c2 = 2.0f;
+        useGA = false;
+        optimizer = new ECPPSO();
+        optimizer.Initialize();
+
+        isOptimizing = true;
+
+        UI.Instance.GenNewLine("ECPPSO");
+
+        StartCoroutine(RunOptimization());
+
+        yield return new WaitUntil(() => isOptimizing == false);
+
+        ECPPSO_FitnessValues = new List<float>(FitnessValuesList);
+        FitnessValuesList.Clear();
+        LineGraphPoints.Clear();
+        SolutionsList.Clear();
+
+
+        //PSO + GA
+        c1 = 2f;
+        c2 = 2f;
+        useGA = true;
+        optimizer = new PSO();
+        optimizer.Initialize();
+
+        isOptimizing = true;
+
+        UI.Instance.GenNewLine("PSO + GA");
+
+        StartCoroutine(RunOptimization());
+
+        yield return new WaitUntil(() => isOptimizing == false);
+
+        PSO_GA_FitnessValues = new List<float>(FitnessValuesList);
+        FitnessValuesList.Clear();
+        LineGraphPoints.Clear();
+        SolutionsList.Clear();
+
+
+        //ECPPSO + GA
+        c1 = 2.0f;
+        c2 = 2.0f;
+        useGA = true;
+        optimizer = new ECPPSO();
+        optimizer.Initialize();
+
+        isOptimizing = true;
+
+        UI.Instance.GenNewLine("ECPPSO + GA");
+
+        StartCoroutine(RunOptimization());
+
+        yield return new WaitUntil(() => isOptimizing == false);
+
+        ECPPSO_GA_FitnessValues = new List<float>(FitnessValuesList);
+        FitnessValuesList.Clear();
+        LineGraphPoints.Clear();
+        SolutionsList.Clear();
+
+
+        //ECPPSO + SE + GA
+        useGA = true;
+        useSE = true;
+        useNEP = false;
+        optimizer = new ECPPSO();
+        optimizer.Initialize();
+
+        isOptimizing = true;
+
+        UI.Instance.GenNewLine("ECPPSO no NEP + GA");
+
+        StartCoroutine(RunOptimization());
+
+        yield return new WaitUntil(() => isOptimizing == false);
+
+        ECPPSO_SE_GA_FitnessValues = new List<float>(FitnessValuesList);
+        FitnessValuesList.Clear();
+        LineGraphPoints.Clear();
+        SolutionsList.Clear();
+
+
+        //ECPPSO + NEP + GA
+        useGA = true;
+        useSE = false;
+        useNEP = true;
+        optimizer = new ECPPSO();
+        optimizer.Initialize();
+
+        isOptimizing = true;
+
+        UI.Instance.GenNewLine("ECPPSO no SE + GA");
+
+        StartCoroutine(RunOptimization());
+
+        yield return new WaitUntil(() => isOptimizing == false);
+
+        ECPPSO_NEP_GA_FitnessValues = new List<float>(FitnessValuesList);
+        
+        isOptimizing = false;
+
+        // Save all results
+        Save(PSO_FitnessValues, ECPPSO_FitnessValues, PSO_GA_FitnessValues, ECPPSO_GA_FitnessValues, ECPPSO_SE_GA_FitnessValues, ECPPSO_NEP_GA_FitnessValues);
+    }
+
+
+    void Save(List<float> PSO, List<float> ECPPSO, List<float> PSO_GA, List<float> ECPPSO_GA, List<float> ECPPSO_SE_GA, List<float> ECPPSO_NEP_GA)
+    {
+        // Xóa file cũ nếu tồn tại
+        if (File.Exists(fitnessFilePath))
+        {
+            File.Delete(fitnessFilePath);
+        }
+
+        string csvContent = "Iteration,PSO,ECPPSO,PSO_GA,ECPPSO_GA,ECPPSO_SE_GA,ECPPSO_NEP_GA\n";
+        int maxCount = Math.Max(PSO.Count, Math.Max(ECPPSO.Count, Math.Max(PSO_GA.Count, Math.Max(ECPPSO_GA.Count, Math.Max(ECPPSO_SE_GA.Count, ECPPSO_NEP_GA.Count)))));
+        for (int i = 0; i < maxCount; i++)  
+        {
+            string psoValue = i < PSO.Count ? PSO[i].ToString("F4") : "";
+            string ecppsoValue = i < ECPPSO.Count ? ECPPSO[i].ToString("F4") : "";
+            string psoGaValue = i < PSO_GA.Count ? PSO_GA[i].ToString("F4") : "";
+            string ecppsoGaValue = i < ECPPSO_GA.Count ? ECPPSO_GA[i].ToString("F4") : "";
+            string ecppsoSeGaValue = i < ECPPSO_SE_GA.Count ? ECPPSO_SE_GA[i].ToString("F4") : "";
+            string ecppsoNepGaValue = i < ECPPSO_NEP_GA.Count ? ECPPSO_NEP_GA[i].ToString("F4") : "";
+
+            csvContent += $"{i + 1},{psoValue},{ecppsoValue},{psoGaValue},{ecppsoGaValue},{ecppsoSeGaValue},{ecppsoNepGaValue}\n";
         }
         File.WriteAllText(fitnessFilePath, csvContent);
     }

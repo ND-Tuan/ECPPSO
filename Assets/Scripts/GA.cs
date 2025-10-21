@@ -40,16 +40,14 @@ public static class GA
         }
     }
 
-    // Thực hiện bước tiến hóa di truyền: tạo con cái từ các cá thể ưu tú và thay thế G% yếu nhất
+    // Thực hiện tiến hóa di truyền
     public static void ApplyGeneticEvolution(List<Particle> population)
     {
         int populationSize = population.Count;
         int stationNum = Controller.Instance.station_num;
         int G_percent = Controller.Instance.G_percent;
-        float eliteFrac = Controller.Instance.eliteFrac / 100f;
+        float eliteFrac = Controller.Instance.E_percent / 100f;
 
-        
-        // Kiểm tra tính hợp lệ của quần thể
         if (population == null || population.Count == 0) return;
 
         // Tính số lượng cá thể yếu cần thay thế (G% bottom)
@@ -59,7 +57,7 @@ public static class GA
         int eliteCount = Mathf.Max(2, Mathf.CeilToInt(populationSize * eliteFrac));
         eliteCount = Mathf.Min(eliteCount, population.Count);
 
-        // Lấy các cá thể ưu tú từ đầu quần thể (phải được sắp xếp giảm dần trước khi gọi)
+        // Lấy các cá thể ưu tú từ đầu quần thể
         var elites = population.Take(eliteCount).ToList();
 
         // Tạo con cái và thay thế G% cá thể yếu nhất
@@ -75,7 +73,6 @@ public static class GA
             // Đột biến vị trí con cái
             MutatePositions(childPos);
 
-            // Tạo hạt con mới (sử dụng lại constructor rồi ghi đè pos/vel/u/pBest)
             var child = new Particle(stationNum);
 
             // Thay thế vị trí con với vị trí được sinh ra
@@ -96,7 +93,7 @@ public static class GA
             Controller.Instance.Evaluate(child);
 
             // Đặt con vào quần thể, thay thế những cá thể yếu nhất (cuối bảng)
-            int replaceIndex = population.Count - 1 - i; // vị trí cuối, i=0 là yếu nhất
+            int replaceIndex = population.Count - 1 - i;
             if (replaceIndex >= 0 && replaceIndex < population.Count)
                 population[replaceIndex] = child;
         }

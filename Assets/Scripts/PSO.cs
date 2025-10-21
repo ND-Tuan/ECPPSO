@@ -59,8 +59,36 @@ public class PSO : IOptimizer
             else
             {
                 for (int j = 0; j < stationNum; j++)
-                    p.pos.Add(new Vector2(Random.Range(-areaL / 2f, areaL / 2f), Random.Range(-areaW / 2f, areaW / 2f)));
+                {
+                    // random vị trí trong vùng
+                    Vector2 pos = new Vector2(Random.Range(-areaL / 2f, areaL / 2f), Random.Range(-areaW / 2f, areaW / 2f));
 
+                    if (Controller.Instance.Obstacles.Count == 0)
+                    {
+                        p.pos.Add(pos);
+                        continue;
+                    }
+
+                    bool insideObstacle;
+                    do
+                    {
+                        insideObstacle = false;
+                        pos = new Vector2(Random.Range(-areaL / 2f, areaL / 2f),
+                                        Random.Range(-areaW / 2f, areaW / 2f));
+
+                        foreach (var ob in Controller.Instance.Obstacles)
+                        {
+                            if (ob.Contains(pos))
+                            {
+                                insideObstacle = true;
+                                break;
+                            }
+                        }
+                    } while (insideObstacle);
+
+                    p.pos.Add(pos);
+                }
+                
                 initialPositions.Add(p.pos);
             }
 

@@ -20,11 +20,6 @@ public class ECPPSO : IOptimizer
     private int iteration = 1;
     private int maxIterations;
 
-    // GA params (tunable)
-    private float eliteFrac = 0.3f;      
-    private float mutationRate = 0.05f; 
-    private float mutationStep = 1.0f;  
-
     private List<List<Vector2>> initialPositions = new List<List<Vector2>>();
 
     // =====================================================
@@ -45,9 +40,6 @@ public class ECPPSO : IOptimizer
         G_percent       = Controller.Instance.G_percent;
         neighborCount   = Controller.Instance.neighborCount;
 
-        eliteFrac       = Controller.Instance.eliteFrac / 100f;
-        mutationRate    = Controller.Instance.mutationRate;
-        mutationStep    = Controller.Instance.mutationStep;
 
         r2 = radius * radius;
 
@@ -70,7 +62,36 @@ public class ECPPSO : IOptimizer
             else
             {
                 for (int j = 0; j < stationNum; j++)
-                    p.pos.Add(new Vector2(Random.Range(-areaL / 2f, areaL / 2f), Random.Range(-areaW / 2f, areaW / 2f)));
+                {
+                    // random vị trí trong vùng
+                    Vector2 pos = new Vector2(Random.Range(-areaL / 2f, areaL / 2f), Random.Range(-areaW / 2f, areaW / 2f));
+
+                    if( Controller.Instance.Obstacles.Count == 0)
+                    {
+                        p.pos.Add(pos);
+                        continue;
+                    }
+
+                    bool insideObstacle;
+                    do
+                    {
+                        insideObstacle = false;
+                        pos = new Vector2(Random.Range(-areaL / 2f, areaL / 2f),
+                                        Random.Range(-areaW / 2f, areaW / 2f));
+
+                        foreach (var ob in Controller.Instance.Obstacles)
+                        {
+                            if (ob.Contains(pos))
+                            {
+                                insideObstacle = true;
+                                break;
+                            }
+                        }
+                    } while (insideObstacle);
+
+                    p.pos.Add(pos);
+                }
+                    
 
                 initialPositions.Add(p.pos);
             }
@@ -171,12 +192,12 @@ public class ECPPSO : IOptimizer
             if (idx >= population.Count - Gcount)
             {
                 // nhóm yếu
-                ApplySE(p);
+                if (Controller.Instance.useSE) ApplySE(p);
             }
             else
             {
                 // nhóm khá
-                ApplyNEP(p);
+                if (Controller.Instance.useNEP) ApplyNEP(p);
             }
 
             // update position với bounce biên + vmax (giữ như trước)
@@ -203,6 +224,18 @@ public class ECPPSO : IOptimizer
                     vel.y *= -0.5f;
                     p.vel[i] = vel;
                     newPos.y = Mathf.Clamp(newPos.y, -areaW / 2f, areaW / 2f);
+                }
+
+                foreach (var ob in Controller.Instance.Obstacles)
+                {
+                    Vector2 toCenter = newPos - (Vector2)ob.transform.position;
+                    float dist = toCenter.magnitude;
+                    if (dist < ob.maxRadius + radius)
+                    {
+                        float push = (ob.maxRadius + radius - dist) * 0.3f;
+                        newPos += toCenter.normalized * push;
+                        p.vel[i] *= 0.8f;
+                    }
                 }
 
                 p.pos[i] = newPos;
