@@ -22,6 +22,7 @@ public class ECPPSO : IOptimizer
     private float gamma = 0.1f;         // Eq.6 hệ số né vật cản
     private float delta = 0.05f;        // Eq.13 hệ số phạt SE
     private float losFactor = 0.7f;     // giảm F_SE khi bị che khuất
+    private float vmax; // velocity limit
 
     private List<Particle> population;
     private Particle gBest;
@@ -48,6 +49,7 @@ public class ECPPSO : IOptimizer
 
 
         r2 = radius * radius;
+    vmax = radius;
 
         //  Load/Gen vị trí ban đầu
         if (Controller.Instance.testType == Controller.TestType.LoadInit)
@@ -126,32 +128,11 @@ public class ECPPSO : IOptimizer
     }
 
     // =====================================================
-    // Helper – tìm vật cản gần nhất
-    // =====================================================
-    private Vector2? GetNearestObstacleDir(Vector2 pos)
-    {
-        if (Controller.Instance == null) return null;
-        float minDist = float.MaxValue;
-        Vector2 closest = Vector2.zero;
-
-        foreach (var obs in Controller.Instance.Obstacles)
-        {
-            float dist = Vector2.Distance(pos, obs.transform.position);
-            if (dist < minDist)
-            {
-                minDist = dist;
-                closest = obs.transform.position;
-            }
-        }
-        return closest;
-    }
-
-     // =====================================================
     // NEP (Neighbor Evolution Prediction)
     // =====================================================
     private void ApplyNEP(Particle p)
     {
-        var neighbors = population.OrderBy(q => Mathf.Abs(q.fitness - p.fitness)).Take(neighborCount);
+        var neighbors = population.Where(q => q != p).OrderBy(q => Mathf.Abs(q.fitness - p.fitness)).Take(neighborCount);
         List<Vector2> uri = new List<Vector2>();
 
         for (int i = 0; i < stationNum; i++)
@@ -161,6 +142,8 @@ public class ECPPSO : IOptimizer
                 sum += nb.u[i];
             uri.Add(sum);
         }
+
+        
 
         for (int i = 0; i < stationNum; i++)
         {
@@ -179,6 +162,8 @@ public class ECPPSO : IOptimizer
                     }
                 }
             }
+
+            uri[i] /= (neighbors.Count() + 1f);
 
             float r1 = Random.value, r2r = Random.value;
             Vector2 inertia = w * p.vel[i];
@@ -221,6 +206,16 @@ public class ECPPSO : IOptimizer
     public void RunIteration()
     {
         int Gcount = Mathf.Max(1, populationSize * G_percent / 100);
+
+        foreach (var p in population)
+        {
+            for (int i = 0; i < stationNum; i++)
+            {
+                Vector2 delta = p.pBest[i] - p.pos[i];
+                p.u[i] = 0.5f*p.u[i] + delta;
+            }
+        }
+
         population = population.OrderByDescending(p => p.fitness).ToList();
 
         for (int idx = 0; idx < population.Count; idx++)
@@ -233,26 +228,49 @@ public class ECPPSO : IOptimizer
 
             for (int i = 0; i < stationNum; i++)
             {
-                p.pos[i] += p.vel[i];
 
-                // nếu có vật cản, bật ra ngoài
+                // limit velocity to avoid explosion and unstable moves
+                p.vel[i] = Vector2.ClampMagnitude(p.vel[i], vmax);
+
+                Vector2 newPos = p.pos[i] + p.vel[i];
+
+                if (newPos.x > areaL / 2f || newPos.x < -areaL / 2f)
+                {
+                    Vector2 vel = p.vel[i];
+                    vel.x *= -0.5f;
+                    p.vel[i] = vel;
+                    newPos.x = Mathf.Clamp(newPos.x, -areaL / 2f, areaL / 2f);
+
+                }
+                if (newPos.y > areaW / 2f || newPos.y < -areaW / 2f)
+                {
+                    Vector2 vel = p.vel[i];
+                    vel.y *= -0.5f;
+                    p.vel[i] = vel;
+                    newPos.y = Mathf.Clamp(newPos.y, -areaW / 2f, areaW / 2f);
+                }
+
+                // nếu có vật cản, bật ra ngoài (sử dụng ObstaclePolygon.Contains)
                 if (Controller.Instance.useObstacles && Controller.Instance != null)
                 {
                     foreach (var obs in Controller.Instance.Obstacles)
                     {
-                        var poly = obs.GetComponent<PolygonCollider2D>();
-                        if (poly != null && poly.OverlapPoint(p.pos[i]))
+                        if (obs == null) continue;
+                        if (obs.Contains(newPos))
                         {
-                            Vector2 dir = (p.pos[i] - (Vector2)obs.transform.position).normalized;
-                            p.pos[i] = (Vector2)obs.transform.position + dir * (radius + 1f);
+                            Vector2 dir = (newPos - obs.pos);
+                            if (dir.sqrMagnitude < 1e-6f)
+                                dir = Random.insideUnitCircle.normalized;
+                            else
+                                dir = dir.normalized;
+
+                            float margin = 0.1f;
+                            newPos = obs.pos + dir * (obs.radius + radius + margin);
                         }
                     }
                 }
 
-                p.pos[i] = new Vector2(
-                    Mathf.Clamp(p.pos[i].x, -areaL / 2f, areaL / 2f),
-                    Mathf.Clamp(p.pos[i].y, -areaW / 2f, areaW / 2f)
-                );
+                p.pos[i] = newPos;
             }
 
             Controller.Instance.Evaluate(p);

@@ -238,7 +238,7 @@ MonoBehaviour:
   useObstacles: 1
   optimizerType: 1
   testType: 0
-  useGA: 1
+  useGA: 0
   useSE: 1
   useNEP: 1
   AutoSaveInitial: 0
