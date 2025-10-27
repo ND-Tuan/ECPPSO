@@ -63,7 +63,6 @@ public class Controller : MonoBehaviour
     [Header("Obstacle Polygons")]
     public GameObject obstaclePolygonPrefab;
     public int obstacleCount = 8;
-    public Vector2 vertexRange = new Vector2(3, 8);
     public Vector2 radiusRange = new Vector2(2f, 6f);
     public List<ObstaclePolygon> Obstacles = new List<ObstaclePolygon>();
 
@@ -75,6 +74,8 @@ public class Controller : MonoBehaviour
     private List<float> ECPPSO_GA_FitnessValues = new List<float>();
     private List<float> ECPPSO_SE_GA_FitnessValues = new List<float>();
     private List<float> ECPPSO_NEP_GA_FitnessValues = new List<float>();
+
+    private float timeOptimization = 0f;
 
     // Singleton instance
     public static Controller Instance;
@@ -122,8 +123,15 @@ public class Controller : MonoBehaviour
         isOptimizing = true;
         var best = optimizer.GetBestSolution();
 
+        timeOptimization = Time.realtimeSinceStartup;
+
         for (int i = 0; i < maxIterations; i++)
         {
+            float elapsedTime = 0;
+            
+            elapsedTime += Time.unscaledDeltaTime;
+
+
             optimizer.RunIteration();
             best = optimizer.GetBestSolution();
 
@@ -147,7 +155,7 @@ public class Controller : MonoBehaviour
             UI.Instance.DrawPath(i, LineGraphPoints[i]);
             UI.Instance.UpdateInfoLine(i + 1, FitnessValuesList[i], LineGraphPoints[i]);
 
-            Debug.Log($"{i + 1}: Fitness = {coverage}%");
+            Debug.Log($"Iteration {i + 1}: Fitness = {coverage}%, Time = {elapsedTime}s");
 
             yield return null;
         }
@@ -155,8 +163,10 @@ public class Controller : MonoBehaviour
 
         if (SaveResults) SaveFitnessValues(FitnessValuesList);
 
+        timeOptimization = Time.realtimeSinceStartup - timeOptimization;
 
-        Debug.Log($"Best Coverage = {bestCoverage:F4}% in iteration {bestIter}");
+
+        Debug.Log($"Best Coverage = {bestCoverage:F4}% in iteration {bestIter} in {timeOptimization:F2}s");
 
     }
 
@@ -195,17 +205,14 @@ public class Controller : MonoBehaviour
                 UnityEngine.Random.Range(-areaW / 2f, areaW / 2f)
             );
 
-            int vCount = UnityEngine.Random.Range((int)vertexRange.x, (int)vertexRange.y + 1);
             float minR = radiusRange.x;
             float maxR = radiusRange.y;
 
             var obj = Instantiate(obstaclePolygonPrefab, transform);
             var ob = obj.GetComponent<ObstaclePolygon>();
-            ob.Initialize(center, vCount, minR, maxR);
+            ob.Initialize( UnityEngine.Random.Range(minR, maxR), center);
             Obstacles.Add(ob);
         }
-
-        Debug.Log($"Tạo {Obstacles.Count} vật cản đa giác thành công!");
     }
 
     public void DisplayInfoGraph(float iter)
@@ -220,17 +227,14 @@ public class Controller : MonoBehaviour
     public void Evaluate(Particle p)
     {
         int total = areaL * areaW;
-        BitArray coveredBits = new BitArray(total); // mỗi bit = 1 sample
+        BitArray coveredBits = new BitArray(total);
         int coveredCount = 0;
 
         float offsetX = -areaL / 2f;
         float offsetY = -areaW / 2f;
-        float r2 = stationRadius * stationRadius;
 
-        // Duyệt từng trạm
         foreach (var s in p.pos)
         {
-            // Giới hạn vùng ảnh hưởng trạm
             int xMin = Mathf.Max(0, Mathf.FloorToInt(s.x - stationRadius - offsetX));
             int xMax = Mathf.Min(areaL - 1, Mathf.CeilToInt(s.x + stationRadius - offsetX));
             int yMin = Mathf.Max(0, Mathf.FloorToInt(s.y - stationRadius - offsetY));
@@ -240,35 +244,41 @@ public class Controller : MonoBehaviour
             {
                 for (int x = xMin; x <= xMax; x++)
                 {
-                    int index = y * areaL + x; // vị trí bit tương ứng với sample (x,y)
-                    if (coveredBits[index]) continue; // skip nếu đã phủ
+                    int idx = y * areaL + x;
+                    if (coveredBits[idx]) continue;
 
                     Vector2 sample = new Vector2(offsetX + x + 0.5f, offsetY + y + 0.5f);
-
-                    bool blocked = false;
-                    foreach (var ob in Obstacles)
+                    if ((s - sample).sqrMagnitude <= stationRadius * stationRadius)
                     {
-                        if (ob.Contains(sample))
-                        {
-                            blocked = true;
-                            break;
-                        }
-                    }
-                    if (blocked) continue;
-
-                    if ((s - sample).sqrMagnitude <= r2)
-                    {
-                        coveredBits[index] = true;
+                        coveredBits[idx] = true;
                         coveredCount++;
                     }
                 }
             }
         }
 
-        // coverage %
-        p.fitness = (float)coveredCount / total;
+        float fitness = (float)coveredCount / total;
 
-        // cập nhật pBest nếu tốt hơn
+        // Penalty khi nằm trong vật cản
+        if (useObstacles)
+        {
+            int insideCount = 0;
+            foreach (var s in p.pos)
+            {
+                foreach (var obs in Obstacles)
+                {
+                    if (obs == null) continue;
+                    if (obs.Contains(s))
+                    {
+                        insideCount++;
+                        break;
+                    }
+                }
+            }
+            fitness -= insideCount * 0.01f;
+        }
+
+        p.fitness = Mathf.Clamp01(fitness);
         if (p.fitness > p.pBestFitness)
         {
             p.pBestFitness = p.fitness;
@@ -282,9 +292,44 @@ public class Controller : MonoBehaviour
     {
         if (list.Count == 0) return;
 
-        for (int i = 0; i < station_num; i++)
+        int count = Math.Min(station_num, list.Count);
+        float halfL = areaL / 2f;
+        float halfW = areaW / 2f;
+
+        for (int i = 0; i < count; i++)
         {
-            Stations_List[i].SetPosition(list[i]);
+            Vector2 target = list[i];
+
+            // If obstacles are enabled, push targets out of obstacles instead of placing inside
+            if (useObstacles && Obstacles != null)
+            {
+                foreach (var obs in Obstacles)
+                {
+                    if (obs == null) continue;
+                    if (obs.Contains(target))
+                    {
+                        // direction from obstacle center to target
+                        Vector2 dir = target - obs.pos;
+                        if (dir.sqrMagnitude < 1e-6f)
+                        {
+                            dir = UnityEngine.Random.insideUnitCircle.normalized;
+                        }
+                        else
+                        {
+                            dir = dir.normalized;
+                        }
+
+                        float margin = 0.1f;
+                        target = obs.pos + dir * (obs.radius + stationRadius + margin);
+                    }
+                }
+
+                // ensure within area bounds
+                target.x = Mathf.Clamp(target.x, -halfL + 0.01f, halfL - 0.01f);
+                target.y = Mathf.Clamp(target.y, -halfW + 0.01f, halfW - 0.01f);
+            }
+
+            Stations_List[i].SetPosition(target);
         }
     }
 
@@ -361,13 +406,11 @@ public class Controller : MonoBehaviour
 
 
 
-
-
     private IEnumerator SetUp()
     {
         //PSO
-        c1 = 2f;
-        c2 = 2f;
+        c1 = 0.7f;
+        c2 = 0.7f;
         useGA = false;
         optimizer = new PSO();
         optimizer.Initialize();
@@ -409,8 +452,8 @@ public class Controller : MonoBehaviour
 
 
         //PSO + GA
-        c1 = 2f;
-        c2 = 2f;
+        c1 = 0.7f;
+        c2 = 0.7f;
         useGA = true;
         optimizer = new PSO();
         optimizer.Initialize();
