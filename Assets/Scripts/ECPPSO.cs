@@ -49,7 +49,7 @@ public class ECPPSO : IOptimizer
 
 
         r2 = radius * radius;
-    vmax = radius;
+        vmax = radius;
 
         //  Load/Gen vị trí ban đầu
         if (Controller.Instance.testType == Controller.TestType.LoadInit)
@@ -132,7 +132,7 @@ public class ECPPSO : IOptimizer
     // =====================================================
     private void ApplyNEP(Particle p)
     {
-        var neighbors = population.Where(q => q != p).OrderBy(q => Mathf.Abs(q.fitness - p.fitness)).Take(neighborCount);
+        var neighbors = population.OrderBy(q => Mathf.Abs(q.fitness - p.fitness)).Take(neighborCount);
         List<Vector2> uri = new List<Vector2>();
 
         for (int i = 0; i < stationNum; i++)
@@ -212,7 +212,7 @@ public class ECPPSO : IOptimizer
             for (int i = 0; i < stationNum; i++)
             {
                 Vector2 delta = p.pBest[i] - p.pos[i];
-                p.u[i] = 0.5f*p.u[i] + delta;
+                p.u[i] = 0.9f*p.u[i] + delta;
             }
         }
 
@@ -221,10 +221,14 @@ public class ECPPSO : IOptimizer
         for (int idx = 0; idx < population.Count; idx++)
         {
             var p = population[idx];
-            if (idx >= population.Count - Gcount)
-                ApplySE(p); // nhóm yếu
+            if (idx >= population.Count - Gcount){
+                if(Controller.Instance.useSE) ApplySE(p); // nhóm yếu
+            }
             else
-                ApplyNEP(p); // nhóm khá
+            {
+                if(Controller.Instance.useNEP) ApplyNEP(p); // nhóm khá
+            }
+                
 
             for (int i = 0; i < stationNum; i++)
             {
