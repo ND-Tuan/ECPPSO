@@ -237,13 +237,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   useObstacles: 1
   optimizerType: 1
-  testType: 0
+  testType: 1
   useGA: 0
   useSE: 1
   useNEP: 1
   AutoSaveInitial: 1
   filePath: Assets/Data/S100/data1_S100.json
-  SaveResults: 0
+  SaveResults: 1
   fitnessFilePath: Assets/Data/S100/Result_Data_with_Obstacle.csv
   stationPrefab: {fileID: 5092163109252927539, guid: 5ccd067dcbd1cd04ea2b72c3550a006c, type: 3}
   areaL: 80
@@ -251,7 +251,7 @@ MonoBehaviour:
   station_num: 100
   stationRadius: 5
   populationSize: 50
-  maxIterations: 1500
+  maxIterations: 1000
   w: 0.4
   c1: 2
   c2: 2

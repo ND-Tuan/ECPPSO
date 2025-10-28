@@ -60,11 +60,15 @@ public class Controller : MonoBehaviour
     [Range(0, 1)] public float mutationRate = 0.05f;  // xác suất đột biến
     [Range(0, 10)] public float mutationStep = 1.0f;   // độ dịch chuyển đột biến
 
-    [Header("Obstacle Polygons")]
+    [Header("Obstacle")]
     public GameObject obstaclePolygonPrefab;
     public int obstacleCount = 8;
     public Vector2 radiusRange = new Vector2(2f, 6f);
     public List<ObstaclePolygon> Obstacles = new List<ObstaclePolygon>();
+
+    public float gamma = 0.1f;         // Eq.6 hệ số né vật cản
+    public float delta = 0.05f;        // Eq.13 hệ số phạt SE
+
 
 
     //List

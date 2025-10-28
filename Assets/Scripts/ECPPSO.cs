@@ -158,7 +158,7 @@ public class ECPPSO : IOptimizer
                     if (dist < nearest.radius * 1.5f)
                     {
                         Vector2 dir = (p.pos[i] - nearest.pos).normalized;
-                        avoidance = 0.1f * dir; // γ = 0.1
+                        avoidance = Controller.Instance.gamma * dir;
                     }
                 }
             }
@@ -185,7 +185,7 @@ public class ECPPSO : IOptimizer
         if (Controller.Instance.useObstacles)
         {
             int nearObs = p.pos.Count(pos => Controller.Instance.Obstacles.Any(o => (pos - o.pos).magnitude < o.radius * 2f));
-            Fd -= 0.05f * nearObs; // δ = 0.05
+            Fd -= Controller.Instance.delta * nearObs; // δ = 0.05
         }
 
         for (int i = 0; i < stationNum; i++)
