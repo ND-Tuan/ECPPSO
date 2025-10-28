@@ -237,32 +237,32 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   useObstacles: 1
   optimizerType: 1
-  testType: 0
-  useGA: 1
+  testType: 1
+  useGA: 0
   useSE: 1
   useNEP: 1
-  AutoSaveInitial: 0
-  filePath: 
-  SaveResults: 0
-  fitnessFilePath: 
+  AutoSaveInitial: 1
+  filePath: Assets/Data/S100/data1_S100.json
+  SaveResults: 1
+  fitnessFilePath: Assets/Data/S100/Result_Data_with_Obstacle.csv
   stationPrefab: {fileID: 5092163109252927539, guid: 5ccd067dcbd1cd04ea2b72c3550a006c, type: 3}
-  areaL: 50
-  areaW: 50
-  station_num: 50
+  areaL: 80
+  areaW: 80
+  station_num: 100
   stationRadius: 5
   populationSize: 50
-  maxIterations: 500
+  maxIterations: 1000
   w: 0.4
   c1: 2
   c2: 2
   G_percent: 15
   neighborCount: 3
-  E_percent: 30
+  E_percent: 15
   mutationRate: 0.05
   mutationStep: 1
   obstaclePolygonPrefab: {fileID: 1280181542693759203, guid: f494855b44798c44989da1766cdefae4, type: 3}
   obstacleCount: 8
-  radiusRange: {x: 4, y: 8}
+  radiusRange: {x: 6, y: 12}
   Obstacles: []
 --- !u!4 &83524794
 Transform:
