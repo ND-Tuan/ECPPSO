@@ -165,12 +165,16 @@ public class ECPPSO : IOptimizer
 
             uri[i] /= (neighbors.Count() + 1f);
 
+            uri[i] = uri[i] + avoidance;
+
             float r1 = Random.value, r2r = Random.value;
             Vector2 inertia = w * p.vel[i];
             Vector2 gBestTerm = c1 * r1 * (gBest.pos[i] - p.pos[i]);
             Vector2 nepTerm = c2 * r2r * (uri[i] / Mathf.Max(1, iteration));
 
-            p.vel[i] = inertia + gBestTerm + nepTerm + avoidance;
+            
+
+            p.vel[i] = inertia + gBestTerm + nepTerm + Controller.Instance.CalculateAvoidanceForce(p.pos[i]);
         }
     }
 
@@ -196,7 +200,9 @@ public class ECPPSO : IOptimizer
             Vector2 gBestTerm = c1 * r1 * (gBest.pos[i] - p.pos[i]);
             Vector2 seTerm = c2 * r2r * p.u[i] * ((float)iteration / maxIterations) * Fd;
 
-            p.vel[i] = inertia + gBestTerm + seTerm;
+            Vector2 avoidance = Controller.Instance.CalculateAvoidanceForce(p.pos[i]);
+
+            p.vel[i] = inertia + gBestTerm + seTerm + avoidance;
         }
     }
 
@@ -212,7 +218,7 @@ public class ECPPSO : IOptimizer
             for (int i = 0; i < stationNum; i++)
             {
                 Vector2 delta = p.pBest[i] - p.pos[i];
-                p.u[i] = 0.9f*p.u[i] + delta;
+                p.u[i] = 0.5f*p.u[i] + delta;
             }
         }
 
@@ -234,46 +240,41 @@ public class ECPPSO : IOptimizer
             {
 
                 // limit velocity to avoid explosion and unstable moves
-                p.vel[i] = Vector2.ClampMagnitude(p.vel[i], vmax);
+                Vector2 v = Vector2.ClampMagnitude(p.vel[i], vmax);
 
-                Vector2 newPos = p.pos[i] + p.vel[i];
+                Vector2 newPos = p.pos[i] + v;
 
                 if (newPos.x > areaL / 2f || newPos.x < -areaL / 2f)
                 {
-                    Vector2 vel = p.vel[i];
+                    Vector2 vel = v;
                     vel.x *= -0.5f;
-                    p.vel[i] = vel;
+                    v = vel;
                     newPos.x = Mathf.Clamp(newPos.x, -areaL / 2f, areaL / 2f);
 
                 }
                 if (newPos.y > areaW / 2f || newPos.y < -areaW / 2f)
                 {
-                    Vector2 vel = p.vel[i];
+                    Vector2 vel = v;
                     vel.y *= -0.5f;
-                    p.vel[i] = vel;
+                    v = vel;
                     newPos.y = Mathf.Clamp(newPos.y, -areaW / 2f, areaW / 2f);
                 }
 
                 // nếu có vật cản, bật ra ngoài (sử dụng ObstaclePolygon.Contains)
-                if (Controller.Instance.useObstacles && Controller.Instance != null)
+                if (Controller.Instance.useObstacles)
                 {
                     foreach (var obs in Controller.Instance.Obstacles)
                     {
-                        if (obs == null) continue;
                         if (obs.Contains(newPos))
                         {
-                            Vector2 dir = (newPos - obs.pos);
-                            if (dir.sqrMagnitude < 1e-6f)
-                                dir = Random.insideUnitCircle.normalized;
-                            else
-                                dir = dir.normalized;
-
-                            float margin = 0.1f;
-                            newPos = obs.pos + dir * (obs.radius + radius + margin);
+                            Vector2 dir = (newPos - obs.pos).normalized;
+                            newPos = obs.pos + dir * (obs.radius + Controller.Instance.bounceOffset);
+                            v *= 0.5f; // giảm tốc độ sau va chạm
                         }
                     }
                 }
 
+                p.vel[i] = v;
                 p.pos[i] = newPos;
             }
 

@@ -66,6 +66,11 @@ public class Controller : MonoBehaviour
     public Vector2 radiusRange = new Vector2(2f, 6f);
     public List<ObstaclePolygon> Obstacles = new List<ObstaclePolygon>();
 
+    [Header("Avoidance Settings")]
+    public float avoidanceStrength = 0.4f;     // γ: cường độ lực né
+    public float avoidanceRange = 2.0f;        // vùng ảnh hưởng: 2 × radius
+    public float penaltyWeight = 0.1f;         // β: hệ số phạt fitness
+    public float bounceOffset = 1.0f;
     public float gamma = 0.1f;         // Eq.6 hệ số né vật cản
     public float delta = 0.05f;        // Eq.13 hệ số phạt SE
 
@@ -263,23 +268,21 @@ public class Controller : MonoBehaviour
 
         float fitness = (float)coveredCount / total;
 
-        // Penalty khi nằm trong vật cản
+        float penalty = 0f;
         if (useObstacles)
         {
-            int insideCount = 0;
-            foreach (var s in p.pos)
+            foreach (var pos in p.pos)
             {
                 foreach (var obs in Obstacles)
                 {
-                    if (obs == null) continue;
-                    if (obs.Contains(s))
+                    float dist = Vector2.Distance(pos, obs.pos);
+                    if (dist < avoidanceRange)
                     {
-                        insideCount++;
-                        break;
+                        float factor = Mathf.Clamp01((avoidanceRange - dist) / avoidanceRange);
+                        penalty += factor * penaltyWeight;
                     }
                 }
             }
-            fitness -= insideCount * 0.01f;
         }
 
         p.fitness = Mathf.Clamp01(fitness);
@@ -288,6 +291,29 @@ public class Controller : MonoBehaviour
             p.pBestFitness = p.fitness;
             p.pBest = new List<Vector2>(p.pos);
         }
+    }
+
+    // =====================================================
+    // Lực né vật cản
+    // =====================================================
+    public Vector2 CalculateAvoidanceForce(Vector2 pos)
+    {
+        Vector2 force = Vector2.zero;
+
+        if (!Controller.Instance.useObstacles) return force;
+
+        foreach (var obs in Controller.Instance.Obstacles)
+        {
+            float dist = Vector2.Distance(pos, obs.pos);
+            if (dist < Controller.Instance.avoidanceRange && dist > 0.01f)
+            {
+                Vector2 dir = (pos - obs.pos).normalized;
+                float strength = Controller.Instance.avoidanceStrength * (1f - dist / Controller.Instance.avoidanceRange);
+                force += dir * strength;
+            }
+        }
+
+        return force;
     }
 
 
@@ -412,25 +438,25 @@ public class Controller : MonoBehaviour
 
     private IEnumerator SetUp()
     {
-        // //PSO
-        // c1 = 0.7f;
-        // c2 = 0.7f;
-        // useGA = false;
-        // optimizer = new PSO();
-        // optimizer.Initialize();
+        //PSO
+        c1 = 1f;
+        c2 = 1f;
+        useGA = false;
+        optimizer = new PSO();
+        optimizer.Initialize();
 
-        // isOptimizing = true;
+        isOptimizing = true;
 
-        // UI.Instance.GenNewLine("PSO");
+        UI.Instance.GenNewLine("PSO");
 
-        // StartCoroutine(RunOptimization());
+        StartCoroutine(RunOptimization());
 
-        // yield return new WaitUntil(() => isOptimizing == false);
+        yield return new WaitUntil(() => isOptimizing == false);
 
-        // PSO_FitnessValues = new List<float>(FitnessValuesList);
-        // FitnessValuesList.Clear();
-        // LineGraphPoints.Clear();
-        // SolutionsList.Clear();
+        PSO_FitnessValues = new List<float>(FitnessValuesList);
+        FitnessValuesList.Clear();
+        LineGraphPoints.Clear();
+        SolutionsList.Clear();
 
 
 
@@ -455,25 +481,25 @@ public class Controller : MonoBehaviour
         SolutionsList.Clear();
 
 
-        // //PSO + GA
-        // c1 = 0.7f;
-        // c2 = 0.7f;
-        // useGA = true;
-        // optimizer = new PSO();
-        // optimizer.Initialize();
+        //PSO + GA
+        c1 = 1f;
+        c2 = 1f;
+        useGA = true;
+        optimizer = new PSO();
+        optimizer.Initialize();
 
-        // isOptimizing = true;
+        isOptimizing = true;
 
-        // UI.Instance.GenNewLine("PSO + GA");
+        UI.Instance.GenNewLine("PSO + GA");
 
-        // StartCoroutine(RunOptimization());
+        StartCoroutine(RunOptimization());
 
-        // yield return new WaitUntil(() => isOptimizing == false);
+        yield return new WaitUntil(() => isOptimizing == false);
 
-        // PSO_GA_FitnessValues = new List<float>(FitnessValuesList);
-        // FitnessValuesList.Clear();
-        // LineGraphPoints.Clear();
-        // SolutionsList.Clear();
+        PSO_GA_FitnessValues = new List<float>(FitnessValuesList);
+        FitnessValuesList.Clear();
+        LineGraphPoints.Clear();
+        SolutionsList.Clear();
 
 
         //ECPPSO + GA
@@ -538,9 +564,9 @@ public class Controller : MonoBehaviour
         isOptimizing = false;
 
         // Save all results
-        //Save(PSO_FitnessValues, ECPPSO_FitnessValues, PSO_GA_FitnessValues, ECPPSO_GA_FitnessValues, ECPPSO_SE_GA_FitnessValues, ECPPSO_NEP_GA_FitnessValues);
+        Save(PSO_FitnessValues, ECPPSO_FitnessValues, PSO_GA_FitnessValues, ECPPSO_GA_FitnessValues, ECPPSO_SE_GA_FitnessValues, ECPPSO_NEP_GA_FitnessValues);
 
-        SaveWithObstacles(ECPPSO_FitnessValues, ECPPSO_GA_FitnessValues, ECPPSO_SE_GA_FitnessValues, ECPPSO_NEP_GA_FitnessValues);
+        //SaveWithObstacles(ECPPSO_FitnessValues, ECPPSO_GA_FitnessValues, ECPPSO_SE_GA_FitnessValues, ECPPSO_NEP_GA_FitnessValues);
     }
 
 

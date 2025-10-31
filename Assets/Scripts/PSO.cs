@@ -110,6 +110,9 @@ public class PSO : IOptimizer
     }
 
 
+
+
+
     // =====================================================
     // Run iteration
     // =====================================================
@@ -125,8 +128,9 @@ public class PSO : IOptimizer
                 Vector2 inertia = w * p.vel[i];
                 Vector2 cognitive = c1 * r1 * (p.pBest[i] - p.pos[i]);
                 Vector2 social = c2 * r2r * (gBest.pos[i] - p.pos[i]);
+                Vector2 avoidance = Controller.Instance.CalculateAvoidanceForce(p.pos[i]);
 
-                Vector2 v = inertia + cognitive + social;
+                Vector2 v = inertia + cognitive + social + avoidance;
 
                 // giới hạn vận tốc
                 v = Vector2.ClampMagnitude(v, vmax);
@@ -143,6 +147,20 @@ public class PSO : IOptimizer
                 {
                     v.y *= -0.5f;
                     newPos.y = Mathf.Clamp(newPos.y, -areaW / 2f, areaW / 2f);
+                }
+
+                // Bật ra ngoài nếu vào vật cản
+                if (Controller.Instance.useObstacles)
+                {
+                    foreach (var obs in Controller.Instance.Obstacles)
+                    {
+                        if (obs.Contains(newPos))
+                        {
+                            Vector2 dir = (newPos - obs.pos).normalized;
+                            newPos = obs.pos + dir * (obs.radius + Controller.Instance.bounceOffset);
+                            v *= 0.5f; // giảm tốc độ sau va chạm
+                        }
+                    }
                 }
 
                 p.vel[i] = v;
