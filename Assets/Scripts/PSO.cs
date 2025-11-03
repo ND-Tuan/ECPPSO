@@ -18,6 +18,8 @@ public class PSO : IOptimizer
     private int iteration = 1;
     private int maxIterations = 200;
 
+
+
     private float vmax; // giới hạn vận tốc
     private List<List<Vector2>> initialPositions = new List<List<Vector2>>();
 
