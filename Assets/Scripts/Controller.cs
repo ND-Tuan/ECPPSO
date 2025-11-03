@@ -8,7 +8,7 @@ using UnityEngine;
 
 public class Controller : MonoBehaviour
 {
-    public enum OptimizerType { PSO, ECPPSO }
+    public enum OptimizerType { PSO, ECPPSO, GA}
     public enum TestType { RandomInit, LoadInit }
 
     [Header("General Settings")]
@@ -24,7 +24,7 @@ public class Controller : MonoBehaviour
     public string filePath;
     public bool SaveResults = true;
     public string fitnessFilePath;
-
+    public bool SaveRunTimes = true;
     public string RunTimeFilePath;
 
     [SerializeField] private GameObject stationPrefab;
@@ -129,6 +129,9 @@ public class Controller : MonoBehaviour
         //         break;
         //     case OptimizerType.ECPPSO:
         //         optimizer = new ECPPSO();
+        //         break;
+        //     case OptimizerType.GA:
+        //         optimizer = new GA_alone();
         //         break;
         // }
 
