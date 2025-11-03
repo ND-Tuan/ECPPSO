@@ -243,27 +243,33 @@ MonoBehaviour:
   useNEP: 1
   AutoSaveInitial: 0
   filePath: Assets/Data/S50/data1_S50.json
-  SaveResults: 0
+  SaveResults: 1
   fitnessFilePath: Assets/Data/S50/Result_Data_with_Obstacle.csv
+  saveRuntimes: 1
+  runTimeFilePath: Assets/Data/S50/RunTimeWithObs.csv
   stationPrefab: {fileID: 5092163109252927539, guid: 5ccd067dcbd1cd04ea2b72c3550a006c, type: 3}
   areaL: 50
   areaW: 50
   station_num: 50
   stationRadius: 5
   populationSize: 50
-  maxIterations: 500
+  maxIterations: 800
   w: 0.4
   c1: 2
   c2: 2
   G_percent: 15
   neighborCount: 3
-  E_percent: 15
+  E_percent: 30
   mutationRate: 0.05
   mutationStep: 1
   obstaclePolygonPrefab: {fileID: 1280181542693759203, guid: f494855b44798c44989da1766cdefae4, type: 3}
   obstacleCount: 8
   radiusRange: {x: 4, y: 8}
   Obstacles: []
+  avoidanceStrength: 0.4
+  avoidanceRange: 2
+  penaltyWeight: 0.1
+  bounceOffset: 1
   gamma: 0.1
   delta: 0.05
 --- !u!4 &83524794
