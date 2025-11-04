@@ -26,6 +26,7 @@ public class Controller : MonoBehaviour
     public string fitnessFilePath;
     public bool SaveRunTimes = true;
     public string RunTimeFilePath;
+    public string totalRunTimeFilePath;
 
     [SerializeField] private GameObject stationPrefab;
     private List<Station> Stations_List = new List<Station>();
@@ -95,6 +96,15 @@ public class Controller : MonoBehaviour
     private List<float> ECPPSO_GA_RunTimes = new List<float>();
     private List<float> ECPPSO_SE_GA_RunTimes = new List<float>();
     private List<float> ECPPSO_NEP_GA_RunTimes = new List<float>();
+
+    // Total run time
+    private List<float> GA_TotalRunTime = new List<float>();
+    private List<float> PSO_TotalRunTime = new List<float>();
+    private List<float> ECPPSO_TotalRunTime = new List<float>();
+    private List<float> PSO_GA_TotalRunTime = new List<float>();
+    private List<float> ECPPSO_GA_TotalRunTime = new List<float>();
+    private List<float> ECPPSO_SE_GA_TotalRunTime = new List<float>();
+    private List<float> ECPPSO_NEP_GA_TotalRunTime = new List<float>();
 
     private float timeOptimization = 0f;
     // runtime tracking
@@ -479,6 +489,7 @@ public class Controller : MonoBehaviour
         GA_FitnessValues = new List<float>(FitnessValuesList);
         // record runtime
         GA_RunTimes = new List<float>(runTimes);
+        GA_TotalRunTime.Add(timeOptimization);
        
         FitnessValuesList.Clear();
         LineGraphPoints.Clear();
@@ -505,6 +516,7 @@ public class Controller : MonoBehaviour
 
         // record runtime
         PSO_RunTimes = new List<float>(runTimes);
+        PSO_TotalRunTime.Add(timeOptimization);
 
         FitnessValuesList.Clear();
         LineGraphPoints.Clear();
@@ -535,6 +547,7 @@ public class Controller : MonoBehaviour
 
         // record runtime
         ECPPSO_RunTimes = new List<float>(runTimes);
+        ECPPSO_TotalRunTime.Add(timeOptimization);
 
         FitnessValuesList.Clear();
         LineGraphPoints.Clear();
@@ -562,6 +575,7 @@ public class Controller : MonoBehaviour
 
         // record runtime
         PSO_GA_RunTimes = new List<float>(runTimes);
+        PSO_GA_TotalRunTime.Add(timeOptimization);
 
         FitnessValuesList.Clear();
         LineGraphPoints.Clear();
@@ -589,6 +603,7 @@ public class Controller : MonoBehaviour
 
         // record runtime
         ECPPSO_GA_RunTimes = new List<float>(runTimes);
+        ECPPSO_GA_TotalRunTime.Add(timeOptimization);
         
         FitnessValuesList.Clear();
         LineGraphPoints.Clear();
@@ -615,6 +630,7 @@ public class Controller : MonoBehaviour
 
         // record runtime
         ECPPSO_SE_GA_RunTimes = new List<float>(runTimes);
+        ECPPSO_SE_GA_TotalRunTime.Add(timeOptimization);
 
         FitnessValuesList.Clear();
         LineGraphPoints.Clear();
@@ -642,12 +658,14 @@ public class Controller : MonoBehaviour
 
         // record runtime
         ECPPSO_NEP_GA_RunTimes = new List<float>(runTimes);
+        ECPPSO_NEP_GA_TotalRunTime.Add(timeOptimization);
         
         isOptimizing = false;
 
         // Save all results
         Save(fitnessFilePath,GA_FitnessValues,PSO_FitnessValues, ECPPSO_FitnessValues, PSO_GA_FitnessValues, ECPPSO_GA_FitnessValues, ECPPSO_SE_GA_FitnessValues, ECPPSO_NEP_GA_FitnessValues);
-        Save(RunTimeFilePath,GA_RunTimes,PSO_RunTimes, ECPPSO_RunTimes, PSO_GA_RunTimes, ECPPSO_GA_RunTimes, ECPPSO_SE_GA_RunTimes, ECPPSO_NEP_GA_RunTimes);
+        Save(RunTimeFilePath, GA_RunTimes, PSO_RunTimes, ECPPSO_RunTimes, PSO_GA_RunTimes, ECPPSO_GA_RunTimes, ECPPSO_SE_GA_RunTimes, ECPPSO_NEP_GA_RunTimes);
+        Save(totalRunTimeFilePath, GA_TotalRunTime, PSO_TotalRunTime, ECPPSO_TotalRunTime, PSO_GA_TotalRunTime, ECPPSO_GA_TotalRunTime, ECPPSO_SE_GA_TotalRunTime, ECPPSO_NEP_GA_TotalRunTime);
 
         //SaveWithObstacles(ECPPSO_FitnessValues, ECPPSO_GA_FitnessValues, ECPPSO_SE_GA_FitnessValues, ECPPSO_NEP_GA_FitnessValues);
     }
