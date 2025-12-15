@@ -26,6 +26,7 @@ public class Controller : MonoBehaviour
     public string fitnessFilePath;
     public bool SaveRunTimes = true;
     public string RunTimeFilePath;
+    public string totalRunTimeFilePath;
 
     [SerializeField] private GameObject stationPrefab;
     private List<Station> Stations_List = new List<Station>();
@@ -95,6 +96,15 @@ public class Controller : MonoBehaviour
     private List<float> ECPPSO_GA_RunTimes = new List<float>();
     private List<float> ECPPSO_SE_GA_RunTimes = new List<float>();
     private List<float> ECPPSO_NEP_GA_RunTimes = new List<float>();
+
+    // Total run time
+    private List<float> GA_TotalRunTime = new List<float>();
+    private List<float> PSO_TotalRunTime = new List<float>();
+    private List<float> ECPPSO_TotalRunTime = new List<float>();
+    private List<float> PSO_GA_TotalRunTime = new List<float>();
+    private List<float> ECPPSO_GA_TotalRunTime = new List<float>();
+    private List<float> ECPPSO_SE_GA_TotalRunTime = new List<float>();
+    private List<float> ECPPSO_NEP_GA_TotalRunTime = new List<float>();
 
     private float timeOptimization = 0f;
     // runtime tracking
@@ -491,6 +501,7 @@ public class Controller : MonoBehaviour
 
         // record runtime
         PSO_RunTimes = new List<float>(runTimes);
+        PSO_TotalRunTime.Add(timeOptimization);
 
         FitnessValuesList.Clear();
         LineGraphPoints.Clear();
@@ -521,6 +532,7 @@ public class Controller : MonoBehaviour
 
         // record runtime
         ECPPSO_RunTimes = new List<float>(runTimes);
+        ECPPSO_TotalRunTime.Add(timeOptimization);
 
         FitnessValuesList.Clear();
         LineGraphPoints.Clear();
@@ -575,6 +587,7 @@ public class Controller : MonoBehaviour
 
         // record runtime
         ECPPSO_GA_RunTimes = new List<float>(runTimes);
+        ECPPSO_GA_TotalRunTime.Add(timeOptimization);
         
         FitnessValuesList.Clear();
         LineGraphPoints.Clear();
