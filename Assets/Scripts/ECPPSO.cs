@@ -19,10 +19,7 @@ public class ECPPSO : IOptimizer
     private int G_percent = 15;
 
     [Header("Obstacle Settings")]
-    private float gamma = 0.1f;         // Eq.6 hệ số né vật cản
-    private float delta = 0.05f;        // Eq.13 hệ số phạt SE
-    private float losFactor = 0.7f;     // giảm F_SE khi bị che khuất
-    private float vmax; // velocity limit
+        private float vmax; // velocity limit
 
     private List<Particle> population;
     private Particle gBest;
@@ -158,7 +155,7 @@ public class ECPPSO : IOptimizer
                     if (dist < nearest.radius * 1.5f)
                     {
                         Vector2 dir = (p.pos[i] - nearest.pos).normalized;
-                        avoidance = Controller.Instance.gamma * dir;
+                        avoidance = Controller.Instance.delta * dir;
                     }
                 }
             }
@@ -189,7 +186,7 @@ public class ECPPSO : IOptimizer
         if (Controller.Instance.useObstacles)
         {
             int nearObs = p.pos.Count(pos => Controller.Instance.Obstacles.Any(o => (pos - o.pos).magnitude < o.radius * 2f));
-            Fd -= Controller.Instance.delta * nearObs; // δ = 0.05
+            Fd -= Controller.Instance.epsilon * nearObs; // δ = 0.05
         }
 
         for (int i = 0; i < stationNum; i++)
@@ -218,7 +215,7 @@ public class ECPPSO : IOptimizer
             for (int i = 0; i < stationNum; i++)
             {
                 Vector2 delta = p.pBest[i] - p.pos[i];
-                p.u[i] = 0.5f*p.u[i] + delta;
+                p.u[i] =0.5f * p.u[i] + delta;
             }
         }
 
@@ -258,20 +255,6 @@ public class ECPPSO : IOptimizer
                     vel.y *= -0.5f;
                     v = vel;
                     newPos.y = Mathf.Clamp(newPos.y, -areaW / 2f, areaW / 2f);
-                }
-
-                // nếu có vật cản, bật ra ngoài (sử dụng ObstaclePolygon.Contains)
-                if (Controller.Instance.useObstacles)
-                {
-                    foreach (var obs in Controller.Instance.Obstacles)
-                    {
-                        if (obs.Contains(newPos))
-                        {
-                            Vector2 dir = (newPos - obs.pos).normalized;
-                            newPos = obs.pos + dir * (obs.radius + Controller.Instance.bounceOffset);
-                            v *= 0.5f; // giảm tốc độ sau va chạm
-                        }
-                    }
                 }
 
                 p.vel[i] = v;

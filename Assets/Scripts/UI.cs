@@ -8,6 +8,7 @@ public class UI : MonoBehaviour
 {
     [Header("UI Elements")]
     [SerializeField] private Transform Map;
+    [SerializeField] private Transform MapOutline;
     [SerializeField] private LineRenderer Line;
     [SerializeField] private Slider XSlider;
 
@@ -42,6 +43,7 @@ public class UI : MonoBehaviour
     public void GenMap(int length, int width)
     {
         Map.localScale = new Vector3(length, width, 1);
+        MapOutline.localScale = new Vector3(length + 1f, width + 1f, 1);
     }
 
     public void GenGraph(int pointCount)

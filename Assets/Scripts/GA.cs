@@ -33,9 +33,23 @@ public static class GA
             {
                 Vector2 delta = new Vector2(Random.Range(-mutationStep, mutationStep),
                                             Random.Range(-mutationStep, mutationStep));
-                pos[i] += delta;
-                pos[i] = new Vector2(Mathf.Clamp(pos[i].x, -areaL / 2f, areaL / 2f),
-                                     Mathf.Clamp(pos[i].y, -areaW / 2f, areaW / 2f));
+
+                Vector2 newPos = pos[i] + delta;
+
+                if (Controller.Instance.useObstacles)
+                {
+                    foreach (var obs in Controller.Instance.Obstacles)
+                    {
+                        if (obs.Contains(newPos))
+                        {
+                            newPos = pos[i]; // hủy đột biến nếu vào vật cản
+                            break;
+                        }
+                    }
+                }
+
+                pos[i] = new Vector2(Mathf.Clamp(newPos.x, -areaL / 2f, areaL / 2f),
+                                     Mathf.Clamp(newPos.y, -areaW / 2f, areaW / 2f));
             }
         }
     }

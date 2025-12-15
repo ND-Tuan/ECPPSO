@@ -9,7 +9,7 @@ public class Particle
         public List<Vector2> pBest;
         public float fitness;
         public float pBestFitness;
-        public List<Vector2> u; // vector dự đoán (Eq.6)
+        public List<Vector2> u; // vector dự đoán
 
         public Particle(int stationNum)
         {

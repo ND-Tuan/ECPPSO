@@ -34,6 +34,7 @@ public class Controller : MonoBehaviour
     private List<List<Vector2>> SolutionsList = new List<List<Vector2>>();
     private IOptimizer optimizer;
 
+    public float bounceOffset = 1.0f;
     private bool isOptimizing = false;
     private float bestCoverage = 0f;
     private int bestIter = 0;
@@ -58,23 +59,22 @@ public class Controller : MonoBehaviour
     public int neighborCount = 3;
 
     [Header("GA params")]
-    [Range(0, 100)] public int E_percent = 30;      //% cá thể ưu tú làm cha mẹ
+    [Range(0, 100)] public int E_percent = 15;      //% cá thể ưu tú làm cha mẹ
     [Range(0, 1)] public float mutationRate = 0.05f;  // xác suất đột biến
     [Range(0, 10)] public float mutationStep = 1.0f;   // độ dịch chuyển đột biến
 
     [Header("Obstacle")]
     public GameObject obstaclePolygonPrefab;
-    public int obstacleCount = 8;
-    public Vector2 radiusRange = new Vector2(2f, 6f);
     public List<ObstaclePolygon> Obstacles = new List<ObstaclePolygon>();
 
+    public int obstacleCount = 8;   // số vật cản
+    public Vector2 radiusRange = new Vector2(2f, 6f);  // phạm vi bán kính vật cản
+   
     [Header("Avoidance Settings")]
     public float avoidanceStrength = 0.4f;     // γ: cường độ lực né
     public float avoidanceRange = 2.0f;        // vùng ảnh hưởng: 2 × radius
-    public float penaltyWeight = 0.1f;         // β: hệ số phạt fitness
-    public float bounceOffset = 1.0f;
-    public float gamma = 0.1f;         // Eq.6 hệ số né vật cản
-    public float delta = 0.05f;        // Eq.13 hệ số phạt SE
+    public float delta = 0.1f;         // 𝛿 hệ số đẩy ngược 
+    public float epsilon = 0.05f;        //  𝜀 Hệ số giảm SE
 
 
 
@@ -253,6 +253,8 @@ public class Controller : MonoBehaviour
         UI.Instance.UpdateInfoLine(i + 1, FitnessValuesList[i], LineGraphPoints[i]);
     }
 
+    
+
     public void Evaluate(Particle p)
     {
         int total = areaL * areaW;
@@ -288,23 +290,7 @@ public class Controller : MonoBehaviour
 
         float fitness = (float)coveredCount / total;
 
-        float penalty = 0f;
-        if (useObstacles)
-        {
-            foreach (var pos in p.pos)
-            {
-                foreach (var obs in Obstacles)
-                {
-                    float dist = Vector2.Distance(pos, obs.pos);
-                    if (dist < avoidanceRange)
-                    {
-                        float factor = Mathf.Clamp01((avoidanceRange - dist) / avoidanceRange);
-                        penalty += factor * penaltyWeight;
-                    }
-                }
-            }
-        }
-
+       
         p.fitness = Mathf.Clamp01(fitness);
         if (p.fitness > p.pBestFitness)
         {
@@ -458,36 +444,36 @@ public class Controller : MonoBehaviour
 
     private IEnumerator SetUp()
     {
-        // GA alone
-        c1 = 1f;
-        c2 = 1f;
-        useGA = false;
-        useSE = false;
-        useNEP = false;
-        optimizer = new GA_alone();
-        optimizer.Initialize();
+        // // GA alone
+        // c1 = 0.7f;
+        // c2 = 0.7f;
+        // useGA = false;
+        // useSE = false;
+        // useNEP = false;
+        // optimizer = new GA_alone();
+        // optimizer.Initialize();
 
-        isOptimizing = true;
+        // isOptimizing = true;
 
-        UI.Instance.GenNewLine("GA");
+        // UI.Instance.GenNewLine("GA");
 
-        StartCoroutine(RunOptimization());
+        // StartCoroutine(RunOptimization());
 
-        yield return new WaitUntil(() => isOptimizing == false);
+        // yield return new WaitUntil(() => isOptimizing == false);
 
-        // record fitness values
-        GA_FitnessValues = new List<float>(FitnessValuesList);
-        // record runtime
-        GA_RunTimes = new List<float>(runTimes);
+        // // record fitness values
+        // GA_FitnessValues = new List<float>(FitnessValuesList);
+        // // record runtime
+        // GA_RunTimes = new List<float>(runTimes);
        
-        FitnessValuesList.Clear();
-        LineGraphPoints.Clear();
-        SolutionsList.Clear();
-        runTimes.Clear();
+        // FitnessValuesList.Clear();
+        // LineGraphPoints.Clear();
+        // SolutionsList.Clear();
+        // runTimes.Clear();
 
         //PSO
-        c1 = 1f;
-        c2 = 1f;
+        c1 = 0.7f;
+        c2 = 0.7f;
         useGA = false;
         optimizer = new PSO();
         optimizer.Initialize();
@@ -543,30 +529,30 @@ public class Controller : MonoBehaviour
 
 
         //PSO + GA
-        c1 = 1f;
-        c2 = 1f;
-        useGA = true;
-        optimizer = new PSO();
-        optimizer.Initialize();
+        // c1 = 0.7f;
+        // c2 = 0.7f;
+        // useGA = true;
+        // optimizer = new PSO();
+        // optimizer.Initialize();
 
-        isOptimizing = true;
+        // isOptimizing = true;
 
-        UI.Instance.GenNewLine("PSO + GA");
+        // UI.Instance.GenNewLine("PSO + GA");
 
-        StartCoroutine(RunOptimization());
+        // StartCoroutine(RunOptimization());
 
-        yield return new WaitUntil(() => isOptimizing == false);
+        // yield return new WaitUntil(() => isOptimizing == false);
 
-        // record fitness values
-        PSO_GA_FitnessValues = new List<float>(FitnessValuesList);
+        // // record fitness values
+        // PSO_GA_FitnessValues = new List<float>(FitnessValuesList);
 
-        // record runtime
-        PSO_GA_RunTimes = new List<float>(runTimes);
+        // // record runtime
+        // PSO_GA_RunTimes = new List<float>(runTimes);
 
-        FitnessValuesList.Clear();
-        LineGraphPoints.Clear();
-        SolutionsList.Clear();
-        runTimes.Clear();
+        // FitnessValuesList.Clear();
+        // LineGraphPoints.Clear();
+        // SolutionsList.Clear();
+        // runTimes.Clear();
 
 
         //ECPPSO + GA
@@ -595,61 +581,61 @@ public class Controller : MonoBehaviour
         SolutionsList.Clear();
         runTimes.Clear();
 
-        //ECPPSO + SE + GA
-        useGA = true;
-        useSE = true;
-        useNEP = false;
-        optimizer = new ECPPSO();
-        optimizer.Initialize();
+        // //ECPPSO + SE + GA
+        // useGA = true;
+        // useSE = true;
+        // useNEP = false;
+        // optimizer = new ECPPSO();
+        // optimizer.Initialize();
 
-        isOptimizing = true;
+        // isOptimizing = true;
 
-        UI.Instance.GenNewLine("ECPPSO no NEP + GA");
+        // UI.Instance.GenNewLine("ECPPSO no NEP + GA");
 
-        StartCoroutine(RunOptimization());
+        // StartCoroutine(RunOptimization());
 
-        yield return new WaitUntil(() => isOptimizing == false);
+        // yield return new WaitUntil(() => isOptimizing == false);
 
-        // record fitness values
-        ECPPSO_SE_GA_FitnessValues = new List<float>(FitnessValuesList);
+        // // record fitness values
+        // ECPPSO_SE_GA_FitnessValues = new List<float>(FitnessValuesList);
 
-        // record runtime
-        ECPPSO_SE_GA_RunTimes = new List<float>(runTimes);
+        // // record runtime
+        // ECPPSO_SE_GA_RunTimes = new List<float>(runTimes);
 
-        FitnessValuesList.Clear();
-        LineGraphPoints.Clear();
-        SolutionsList.Clear();
-        runTimes.Clear();
+        // FitnessValuesList.Clear();
+        // LineGraphPoints.Clear();
+        // SolutionsList.Clear();
+        // runTimes.Clear();
 
 
-        //ECPPSO + NEP + GA
-        useGA = true;
-        useSE = false;
-        useNEP = true;
-        optimizer = new ECPPSO();
-        optimizer.Initialize();
+        // //ECPPSO + NEP + GA
+        // useGA = true;
+        // useSE = false;
+        // useNEP = true;
+        // optimizer = new ECPPSO();
+        // optimizer.Initialize();
 
-        isOptimizing = true;
+        // isOptimizing = true;
 
-        UI.Instance.GenNewLine("ECPPSO no SE + GA");
+        // UI.Instance.GenNewLine("ECPPSO no SE + GA");
 
-        StartCoroutine(RunOptimization());
+        // StartCoroutine(RunOptimization());
 
-        yield return new WaitUntil(() => isOptimizing == false);
+        // yield return new WaitUntil(() => isOptimizing == false);
 
-        // record fitness values
-        ECPPSO_NEP_GA_FitnessValues = new List<float>(FitnessValuesList);
+        // // record fitness values
+        // ECPPSO_NEP_GA_FitnessValues = new List<float>(FitnessValuesList);
 
-        // record runtime
-        ECPPSO_NEP_GA_RunTimes = new List<float>(runTimes);
+        // // record runtime
+        // ECPPSO_NEP_GA_RunTimes = new List<float>(runTimes);
         
-        isOptimizing = false;
+        // isOptimizing = false;
 
         // Save all results
-        Save(fitnessFilePath,GA_FitnessValues,PSO_FitnessValues, ECPPSO_FitnessValues, PSO_GA_FitnessValues, ECPPSO_GA_FitnessValues, ECPPSO_SE_GA_FitnessValues, ECPPSO_NEP_GA_FitnessValues);
+        //Save(fitnessFilePath,GA_FitnessValues,PSO_FitnessValues, ECPPSO_FitnessValues, PSO_GA_FitnessValues, ECPPSO_GA_FitnessValues, ECPPSO_SE_GA_FitnessValues, ECPPSO_NEP_GA_FitnessValues);
         Save(RunTimeFilePath,GA_RunTimes,PSO_RunTimes, ECPPSO_RunTimes, PSO_GA_RunTimes, ECPPSO_GA_RunTimes, ECPPSO_SE_GA_RunTimes, ECPPSO_NEP_GA_RunTimes);
 
-        //SaveWithObstacles(ECPPSO_FitnessValues, ECPPSO_GA_FitnessValues, ECPPSO_SE_GA_FitnessValues, ECPPSO_NEP_GA_FitnessValues);
+        SaveWithObstacles(PSO_FitnessValues, ECPPSO_FitnessValues, ECPPSO_GA_FitnessValues);
     }
 
 
@@ -678,7 +664,7 @@ public class Controller : MonoBehaviour
         File.WriteAllText(filePath, csvContent);
     }
 
-    void SaveWithObstacles(List<float> ECPPSO, List<float> ECPPSO_GA, List<float> ECPPSO_SE_GA, List<float> ECPPSO_NEP_GA)
+    void SaveWithObstacles(List<float> PSO, List<float> ECPPSO, List<float> ECPPSO_GA)
     {
         // Xóa file cũ nếu tồn tại
         if (File.Exists(fitnessFilePath))
@@ -686,16 +672,15 @@ public class Controller : MonoBehaviour
             File.Delete(fitnessFilePath);
         }
 
-        string csvContent = "Iteration,ECPPSO,ECPPSO_GA,ECPPSO_SE_GA,ECPPSO_NEP_GA\n";
-        int maxCount = Math.Max(ECPPSO.Count, Math.Max(ECPPSO_GA.Count, Math.Max(ECPPSO_SE_GA.Count, ECPPSO_NEP_GA.Count)));
+        string csvContent = "Iteration, PSO,ECPPSO,ECPPSO_GA\n";
+        int maxCount = Math.Max(PSO.Count, Math.Max(ECPPSO.Count, ECPPSO_GA.Count));
         for (int i = 0; i < maxCount; i++)
         {
+            string psoValue = i < PSO.Count ? PSO[i].ToString("F4") : "";
             string ecppsoValue = i < ECPPSO.Count ? ECPPSO[i].ToString("F4") : "";
             string ecppsoGaValue = i < ECPPSO_GA.Count ? ECPPSO_GA[i].ToString("F4") : "";
-            string ecppsoSeGaValue = i < ECPPSO_SE_GA.Count ? ECPPSO_SE_GA[i].ToString("F4") : "";
-            string ecppsoNepGaValue = i < ECPPSO_NEP_GA.Count ? ECPPSO_NEP_GA[i].ToString("F4") : "";
-
-            csvContent += $"{i + 1},{ecppsoValue},{ecppsoGaValue},{ecppsoSeGaValue},{ecppsoNepGaValue}\n";
+           
+            csvContent += $"{i + 1},{psoValue},{ecppsoValue},{ecppsoGaValue}\n";
         }
         File.WriteAllText(fitnessFilePath, csvContent);
     }
