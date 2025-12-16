@@ -10,6 +10,8 @@ public class ObstaclePolygon : MonoBehaviour
     public float radius = 5f;
     public Vector2 pos;
 
+    List<Vector2> points;
+
     public void Initialize(float radius, Vector2 position)
     {
         this.radius = radius;
@@ -24,10 +26,12 @@ public class ObstaclePolygon : MonoBehaviour
         transform.localScale = new Vector2(radius * 2, radius * 2);
     }
 
-     public bool Contains(Vector2 worldPoint)
+    public bool Contains(Vector2 worldPoint)
     {
         if (circleCollider == null) circleCollider = GetComponent<CircleCollider2D>();
         // OverlapPoint expects world-space coordinates for Collider2D
         return circleCollider != null && circleCollider.OverlapPoint(worldPoint);
     }
+
+    
 }

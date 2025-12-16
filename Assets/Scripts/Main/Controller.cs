@@ -66,10 +66,11 @@ public class Controller : MonoBehaviour
 
     [Header("Obstacle")]
     public GameObject obstaclePolygonPrefab;
-    public List<ObstaclePolygon> Obstacles = new List<ObstaclePolygon>();
-
+    public List<PolygonMesh> Obstacles = new List<PolygonMesh>();
+    
     public int obstacleCount = 8;   // số vật cản
     public Vector2 radiusRange = new Vector2(2f, 6f);  // phạm vi bán kính vật cản
+    public Vector2 vertexCountRange = new Vector2(4, 10); // phạm vi số đỉnh vật cản
    
     [Header("Avoidance Settings")]
     public float avoidanceStrength = 0.4f;     // γ: cường độ lực né
@@ -239,18 +240,17 @@ public class Controller : MonoBehaviour
 
         for (int i = 0; i < obstacleCount; i++)
         {
-            Vector2 center = new Vector2(
-                UnityEngine.Random.Range(-areaL / 2f, areaL / 2f),
-                UnityEngine.Random.Range(-areaW / 2f, areaW / 2f)
-            );
+            float radius = UnityEngine.Random.Range(radiusRange.x, radiusRange.y);
+            int vertexCount = UnityEngine.Random.Range((int)vertexCountRange.x, (int)vertexCountRange.y + 1);
 
-            float minR = radiusRange.x;
-            float maxR = radiusRange.y;
+            Vector2[] points = GenObstacle.GenConvexPolygon(vertexCount, radius);
 
-            var obj = Instantiate(obstaclePolygonPrefab, transform);
-            var ob = obj.GetComponent<ObstaclePolygon>();
-            ob.Initialize( UnityEngine.Random.Range(minR, maxR), center);
-            Obstacles.Add(ob);
+            GameObject obsObj = Instantiate(obstaclePolygonPrefab);
+            PolygonMesh polygonMesh = obsObj.GetComponent<PolygonMesh>();
+            polygonMesh.CreatePolygon(points);
+
+            // Store obstacle
+            Obstacles.Add(polygonMesh);
         }
     }
 
@@ -316,17 +316,17 @@ public class Controller : MonoBehaviour
     {
         Vector2 force = Vector2.zero;
 
-        if (!Controller.Instance.useObstacles) return force;
+        if (!useObstacles) return force;
 
         foreach (var obs in Obstacles)
         {
-            float dist = Vector2.Distance(pos, obs.pos);
-            if (dist < avoidanceRange && dist > 0.01f)
-            {
-                Vector2 dir = (pos - obs.pos).normalized;
-                float strength = avoidanceStrength * (1f - dist / avoidanceRange);
-                force += dir * strength;
-            }
+            float dist;
+            Vector2 edgeNormal = obs.GetClosestEdgeNormal(pos, out dist);
+            
+            
+            float strength = avoidanceStrength * (1 /(dist * dist + 0.0000001f)); // lực tỉ lệ nghịch với bình phương khoảng cách
+            force += edgeNormal * strength;
+            
         }
 
         return force;
@@ -354,19 +354,18 @@ public class Controller : MonoBehaviour
                     if (obs == null) continue;
                     if (obs.Contains(target))
                     {
-                        // direction from obstacle center to target
-                        Vector2 dir = target - obs.pos;
-                        if (dir.sqrMagnitude < 1e-6f)
+                        // Use outward normal from closest edge to push target out
+                        float dist;
+                        Vector2 normal = obs.GetClosestEdgeNormal(target, out dist);
+                        
+                        if (normal.sqrMagnitude < 1e-6f)
                         {
-                            dir = UnityEngine.Random.insideUnitCircle.normalized;
-                        }
-                        else
-                        {
-                            dir = dir.normalized;
+                            normal = UnityEngine.Random.insideUnitCircle.normalized;
                         }
 
-                        float margin = 0.1f;
-                        target = obs.pos + dir * (obs.radius + stationRadius + margin);
+                        // Push target out along the normal direction
+                        float pushDistance = stationRadius + 0.1f;
+                        target += normal * pushDistance;
                     }
                 }
 

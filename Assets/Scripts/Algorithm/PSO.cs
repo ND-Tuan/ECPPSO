@@ -151,19 +151,6 @@ public class PSO : IOptimizer
                     newPos.y = Mathf.Clamp(newPos.y, -areaW / 2f, areaW / 2f);
                 }
 
-                // Bật ra ngoài nếu vào vật cản
-                if (Controller.Instance.useObstacles)
-                {
-                    foreach (var obs in Controller.Instance.Obstacles)
-                    {
-                        if (obs.Contains(newPos))
-                        {
-                            Vector2 dir = (newPos - obs.pos).normalized;
-                            newPos = obs.pos + dir * (obs.radius + Controller.Instance.bounceOffset);
-                            v *= 0.5f; // giảm tốc độ sau va chạm
-                        }
-                    }
-                }
 
                 p.vel[i] = v;
                 p.pos[i] = newPos;

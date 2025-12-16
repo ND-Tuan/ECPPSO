@@ -147,17 +147,24 @@ public class ECPPSO : IOptimizer
             Vector2 avoidance = Vector2.zero;
             if (Controller.Instance.useObstacles)
             {
-                // hướng tránh vật cản gần nhất
-                var nearest = Controller.Instance.Obstacles.OrderBy(o => (p.pos[i] - o.pos).sqrMagnitude).FirstOrDefault();
-                if (nearest != null)
+                // Find nearest obstacle edge and get avoidance direction
+                float minDist = float.MaxValue;
+                Vector2 bestNormal = Vector2.zero;
+                
+                foreach (var obs in Controller.Instance.Obstacles)
                 {
-                    float dist = Vector2.Distance(p.pos[i], nearest.pos);
-                    if (dist < nearest.radius * 1.5f)
+                    float dist;
+                    Vector2 normal = obs.GetClosestEdgeNormal(p.pos[i], out dist);
+                    if (dist < minDist)
                     {
-                        Vector2 dir = (p.pos[i] - nearest.pos).normalized;
-                        avoidance = Controller.Instance.delta * dir;
+                        minDist = dist;
+                        bestNormal = normal;
                     }
                 }
+                
+                
+                avoidance = Controller.Instance.delta * bestNormal;
+                
             }
 
             uri[i] /= (neighbors.Count() + 1f);
@@ -185,8 +192,21 @@ public class ECPPSO : IOptimizer
 
         if (Controller.Instance.useObstacles)
         {
-            int nearObs = p.pos.Count(pos => Controller.Instance.Obstacles.Any(o => (pos - o.pos).magnitude < o.radius * 2f));
-            Fd -= Controller.Instance.epsilon * nearObs; // δ = 0.05
+            int nearObs = 0;
+            foreach (var pos in p.pos)
+            {
+                foreach (var obs in Controller.Instance.Obstacles)
+                {
+                    float dist;
+                    obs.GetClosestEdgeNormal(pos, out dist);
+                    if (dist < Controller.Instance.avoidanceRange * radius)
+                    {
+                        nearObs++;
+                        break; // Count each position only once
+                    }
+                }
+            }
+            Fd -= Controller.Instance.epsilon * nearObs; // ε = 0.05
         }
 
         for (int i = 0; i < stationNum; i++)
@@ -259,6 +279,26 @@ public class ECPPSO : IOptimizer
 
                 p.vel[i] = v;
                 p.pos[i] = newPos;
+
+                // Check if position is inside obstacle and push out
+                if (Controller.Instance.useObstacles)
+                {
+                    foreach (var obs in Controller.Instance.Obstacles)
+                    {
+                        if (obs.Contains(p.pos[i]))
+                        {
+                            float dist;
+                            Vector2 normal = obs.GetClosestEdgeNormal(p.pos[i], out dist);
+                            if (normal.sqrMagnitude < 1e-6f)
+                                normal = UnityEngine.Random.insideUnitCircle.normalized;
+                            
+                            // Push out along normal
+                            p.pos[i] += normal * (Controller.Instance.stationRadius + 0.2f);
+                            p.vel[i] *= -0.3f; // Bounce back with damping
+                            break;
+                        }
+                    }
+                }
             }
 
             Controller.Instance.Evaluate(p);
