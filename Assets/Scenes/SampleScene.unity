@@ -241,18 +241,17 @@ MonoBehaviour:
   useGA: 0
   useSE: 1
   useNEP: 1
-  AutoSaveInitial: 0
-  filePath: Assets/Data/S50/data1_S50.json
+  AutoSaveInitial: 1
+  filePath: Assets/Data/S100/data1_S100.json
   SaveResults: 0
-  fitnessFilePath: Assets/Data/S50/ResultData.csv
+  fitnessFilePath: 
   SaveRunTimes: 0
-  RunTimeFilePath: Assets/Data/S50/RunTime.csv
+  RunTimeFilePath: 
   totalRunTimeFilePath: 
   stationPrefab: {fileID: 5092163109252927539, guid: 5ccd067dcbd1cd04ea2b72c3550a006c, type: 3}
-  bounceOffset: 1
-  areaL: 50
-  areaW: 50
-  station_num: 50
+  areaL: 70
+  areaW: 70
+  station_num: 100
   stationRadius: 5
   populationSize: 50
   maxIterations: 500
@@ -264,15 +263,26 @@ MonoBehaviour:
   E_percent: 30
   mutationRate: 0.05
   mutationStep: 1
-  obstaclePolygonPrefab: {fileID: 35357031730369191, guid: 83ec73b27aa329b4192e1bd6578337ad, type: 3}
+  obstaclePolygonPrefab: {fileID: 1280181542693759203, guid: f494855b44798c44989da1766cdefae4, type: 3}
   Obstacles: []
-  obstacleCount: 4
-  radiusRange: {x: 10, y: 15}
-  vertexCountRange: {x: 6, y: 8}
+  obstacleCount: 8
+  radiusRange: {x: 6, y: 10}
   avoidanceStrength: 0.4
   avoidanceRange: 2
   delta: 0.05
   epsilon: 0.05
+  dataStruc:
+    positionGroups: []
+    areaL: 50
+    areaW: 50
+    station_num: 50
+    stationRadius: 5
+    populationSize: 50
+    maxIterations: 200
+    w: 0.4
+    c1: 2
+    c2: 2
+    obstacles: []
 --- !u!4 &83524794
 Transform:
   m_ObjectHideFlags: 0
