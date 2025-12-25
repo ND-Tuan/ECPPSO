@@ -35,7 +35,6 @@ public class Controller : MonoBehaviour
     private List<List<Vector2>> SolutionsList = new List<List<Vector2>>();
     private IOptimizer optimizer;
 
-    public float bounceOffset = 1.0f;
     private bool isOptimizing = false;
     private float bestCoverage = 0f;
     private int bestIter = 0;
@@ -66,11 +65,10 @@ public class Controller : MonoBehaviour
 
     [Header("Obstacle")]
     public GameObject obstaclePolygonPrefab;
-    public List<PolygonMesh> Obstacles = new List<PolygonMesh>();
-    
+    public List<ObstaclePolygon> Obstacles = new List<ObstaclePolygon>();
+
     public int obstacleCount = 8;   // số vật cản
     public Vector2 radiusRange = new Vector2(2f, 6f);  // phạm vi bán kính vật cản
-    public Vector2 vertexCountRange = new Vector2(4, 10); // phạm vi số đỉnh vật cản
    
     [Header("Avoidance Settings")]
     public float avoidanceStrength = 0.4f;     // γ: cường độ lực né
@@ -107,9 +105,15 @@ public class Controller : MonoBehaviour
     private List<float> ECPPSO_SE_GA_TotalRunTime = new List<float>();
     private List<float> ECPPSO_NEP_GA_TotalRunTime = new List<float>();
 
+    public DataStruc dataStruc = new DataStruc();
+
     private float timeOptimization = 0f;
     // runtime tracking
     private List<float> runTimes = new List<float>();
+
+    // BitArray để lưu các ô bị vật cản chiếm
+    private BitArray obstacleOccupiedBits;
+    private int obstacleOccupiedCount = 0;
 
     // Singleton instance
     public static Controller Instance;
@@ -120,6 +124,9 @@ public class Controller : MonoBehaviour
             Instance = this;
         else
             Destroy(gameObject);
+
+        if(testType == TestType.LoadInit)
+            LoadInitial();
     }
 
     // Start is called before the first frame update
@@ -238,20 +245,78 @@ public class Controller : MonoBehaviour
         }
         Obstacles.Clear();
 
+        if(testType == TestType.LoadInit && dataStruc.obstacles != null && dataStruc.obstacles.Count > 0)
+        {
+            // load obstacles from dataStruc
+            foreach(var od in dataStruc.obstacles)
+            {
+                var obj = Instantiate(obstaclePolygonPrefab, transform);
+                var ob = obj.GetComponent<ObstaclePolygon>();
+                ob.Initialize(od.radius, od.pos);
+                Obstacles.Add(ob);
+            }
+            return;
+        }
+
         for (int i = 0; i < obstacleCount; i++)
         {
-            float radius = UnityEngine.Random.Range(radiusRange.x, radiusRange.y);
-            int vertexCount = UnityEngine.Random.Range((int)vertexCountRange.x, (int)vertexCountRange.y + 1);
+            Vector2 center = new Vector2(
+                UnityEngine.Random.Range(-areaL / 2f, areaL / 2f),
+                UnityEngine.Random.Range(-areaW / 2f, areaW / 2f)
+            );
 
-            Vector2[] points = GenObstacle.GenConvexPolygon(vertexCount, radius);
+            float minR = radiusRange.x;
+            float maxR = radiusRange.y;
 
-            GameObject obsObj = Instantiate(obstaclePolygonPrefab);
-            PolygonMesh polygonMesh = obsObj.GetComponent<PolygonMesh>();
-            polygonMesh.CreatePolygon(points);
-
-            // Store obstacle
-            Obstacles.Add(polygonMesh);
+            var obj = Instantiate(obstaclePolygonPrefab, transform);
+            var ob = obj.GetComponent<ObstaclePolygon>();
+            ob.Initialize( UnityEngine.Random.Range(minR, maxR), center);
+            Obstacles.Add(ob);
         }
+
+        // Tính các ô bị vật cản chiếm
+        CalculateObstacleOccupiedArea();
+    }
+
+    private void CalculateObstacleOccupiedArea()
+    {
+        int total = areaL * areaW;
+        obstacleOccupiedBits = new BitArray(total);
+        obstacleOccupiedCount = 0;
+
+        if (!useObstacles || Obstacles == null || Obstacles.Count == 0)
+            return;
+
+        float offsetX = -areaL / 2f;
+        float offsetY = -areaW / 2f;
+
+        foreach (var obs in Obstacles)
+        {
+            if (obs == null) continue;
+
+            // Duyệt qua tất cả các ô trong khu vực có thể bị vật cản chiếm
+            int xMin = Mathf.Max(0, Mathf.FloorToInt(obs.pos.x - obs.radius - offsetX));
+            int xMax = Mathf.Min(areaL - 1, Mathf.CeilToInt(obs.pos.x + obs.radius - offsetX));
+            int yMin = Mathf.Max(0, Mathf.FloorToInt(obs.pos.y - obs.radius - offsetY));
+            int yMax = Mathf.Min(areaW - 1, Mathf.CeilToInt(obs.pos.y + obs.radius - offsetY));
+
+            for (int y = yMin; y <= yMax; y++)
+            {
+                for (int x = xMin; x <= xMax; x++)
+                {
+                    Vector2 sample = new Vector2(offsetX + x + 0.5f, offsetY + y + 0.5f);
+                    int idx = y * areaL + x;
+
+                    if (!obstacleOccupiedBits[idx] && obs.Contains(sample))
+                    {
+                        obstacleOccupiedBits[idx] = true;
+                        obstacleOccupiedCount++;
+                    }
+                }
+            }
+        }
+
+        Debug.Log($"Obstacle occupied area: {obstacleOccupiedCount} cells ({(float)obstacleOccupiedCount / total * 100f:F2}%)");
     }
 
     public void DisplayInfoGraph(float iter)
@@ -309,10 +374,11 @@ public class Controller : MonoBehaviour
         }
     }
 
+
     // =====================================================
     // Lực né vật cản
     // =====================================================
-    public Vector2 CalculateAvoidanceForce(Vector2 pos)
+   public Vector2 CalculateAvoidanceForce(Vector2 pos)
     {
         Vector2 force = Vector2.zero;
 
@@ -320,13 +386,13 @@ public class Controller : MonoBehaviour
 
         foreach (var obs in Obstacles)
         {
-            float dist;
-            Vector2 edgeNormal = obs.GetClosestEdgeNormal(pos, out dist);
-            
-            
-            float strength = avoidanceStrength * (1 /(dist * dist + 0.0000001f)); // lực tỉ lệ nghịch với bình phương khoảng cách
-            force += edgeNormal * strength;
-            
+            float dist = Vector2.Distance(pos, obs.pos);
+            if (dist < avoidanceRange && dist > 0.01f)
+            {
+                Vector2 dir = (pos - obs.pos).normalized;
+                float strength = avoidanceStrength * (1f - dist / avoidanceRange);
+                force += dir * strength;
+            }
         }
 
         return force;
@@ -346,7 +412,7 @@ public class Controller : MonoBehaviour
         {
             Vector2 target = list[i];
 
-            // If obstacles are enabled, push targets out of obstacles instead of placing inside
+            //If obstacles are enabled, push targets out of obstacles instead of placing inside
             if (useObstacles && Obstacles != null)
             {
                 foreach (var obs in Obstacles)
@@ -354,18 +420,19 @@ public class Controller : MonoBehaviour
                     if (obs == null) continue;
                     if (obs.Contains(target))
                     {
-                        // Use outward normal from closest edge to push target out
-                        float dist;
-                        Vector2 normal = obs.GetClosestEdgeNormal(target, out dist);
-                        
-                        if (normal.sqrMagnitude < 1e-6f)
+                        // direction from obstacle center to target
+                        Vector2 dir = target - obs.pos;
+                        if (dir.sqrMagnitude < 1e-6f)
                         {
-                            normal = UnityEngine.Random.insideUnitCircle.normalized;
+                            dir = UnityEngine.Random.insideUnitCircle.normalized;
+                        }
+                        else
+                        {
+                            dir = dir.normalized;
                         }
 
-                        // Push target out along the normal direction
-                        float pushDistance = stationRadius + 0.1f;
-                        target += normal * pushDistance;
+                        float margin = 0.1f;
+                        target = obs.pos + dir * (obs.radius + stationRadius + margin);
                     }
                 }
 
@@ -386,53 +453,85 @@ public class Controller : MonoBehaviour
         if (File.Exists(filePath))
             File.Delete(filePath);
 
-        // Bọc dữ liệu
-        List<Vector2Group> groupList = new List<Vector2Group>();
+        // Tạo DataStruc và gán dữ liệu
+        DataStruc data = new DataStruc();
+        
+        // Chuyển đổi List<List<Vector2>> sang List<Vector2Group>
+        data.positionGroups = new List<DataStruc.Vector2Group>();
         foreach (var subList in list)
         {
-            groupList.Add(new Vector2Group { points = subList });
+            data.positionGroups.Add(new DataStruc.Vector2Group { points = subList });
+        }
+        
+        data.areaL = areaL;
+        data.areaW = areaW;
+        data.station_num = station_num;
+        data.stationRadius = stationRadius;
+        data.populationSize = populationSize;
+        data.maxIterations = maxIterations;
+        data.w = w;
+        data.c1 = c1;
+        data.c2 = c2;
+
+        // Lưu thông tin obstacles nếu có
+        if (useObstacles && Obstacles != null)
+        {
+            data.obstacles = new List<DataStruc.ObstacleData>();
+            foreach (var obs in Obstacles)
+            {
+                if (obs != null)
+                {
+                    data.obstacles.Add(new DataStruc.ObstacleData
+                    {
+                        pos = obs.pos,
+                        radius = obs.radius
+                    });
+                }
+            }
         }
 
-        Vector2GroupListWrapper wrapper = new Vector2GroupListWrapper { groups = groupList };
-
         // Chuyển sang JSON
-        string json = JsonUtility.ToJson(wrapper, true);
+        string json = JsonUtility.ToJson(data, true);
 
         // Ghi ra file
         File.WriteAllText(filePath, json);
         Debug.Log("✅ Đã lưu vào: " + filePath);
     }
 
-    public List<List<Vector2>> LoadInitial()
+    public void LoadInitial()
     {
         if (!File.Exists(filePath))
         {
             Debug.LogWarning("⚠️ File chưa tồn tại!");
-            return new List<List<Vector2>>();
+            return;
         }
 
         string json = File.ReadAllText(filePath);
-        Vector2GroupListWrapper wrapper = JsonUtility.FromJson<Vector2GroupListWrapper>(json);
+        dataStruc = JsonUtility.FromJson<DataStruc>(json);
 
         // Nếu đọc lỗi hoặc trống
-        if (wrapper == null || wrapper.groups == null)
+        if (dataStruc == null || dataStruc.positionGroups == null)
         {
             Debug.LogWarning("⚠️ File rỗng hoặc sai cấu trúc!");
-            return new List<List<Vector2>>();
+            return;
         }
 
-        // Chuyển ngược lại dạng List<List<Vector2>>
-        List<List<Vector2>> result = new List<List<Vector2>>();
-        foreach (var g in wrapper.groups)
-        {
-            result.Add(g.points);
-        }
+        // Load các tham số từ file
+        areaL = dataStruc.areaL;
+        areaW = dataStruc.areaW;
+        station_num = dataStruc.station_num;
+        stationRadius = dataStruc.stationRadius;    
+        populationSize = dataStruc.populationSize;
+        maxIterations = dataStruc.maxIterations;
+        w = dataStruc.w;
+        c1 = dataStruc.c1;
+        c2 = dataStruc.c2;
 
-        Debug.Log("✅ Đã load " + result.Count + " nhóm Vector2");
-        return result;
+        Debug.Log($"✅ Đã load {dataStruc.positionGroups.Count} nhóm Vector2 và {dataStruc.obstacles?.Count ?? 0} vật cản");
+        
     }
 
-    void SaveFitnessValues(List<float> list)
+    private void SaveFitnessValues(List<float> list)
     {
         // Xóa file cũ nếu tồn tại
         if (File.Exists(fitnessFilePath))
@@ -481,8 +580,8 @@ public class Controller : MonoBehaviour
         // runTimes.Clear();
 
         //PSO
-        c1 = 0.7f;
-        c2 = 0.7f;
+        c1 = 1.0f;
+        c2 = 1.0f;
         useGA = false;
         optimizer = new PSO();
         optimizer.Initialize();

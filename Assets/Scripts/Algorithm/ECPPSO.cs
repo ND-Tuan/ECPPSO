@@ -50,7 +50,17 @@ public class ECPPSO : IOptimizer
 
         //  Load/Gen vị trí ban đầu
         if (Controller.Instance.testType == Controller.TestType.LoadInit)
-            initialPositions = Controller.Instance.LoadInitial();
+        {
+            // Chuyển đổi từ positionGroups sang List<List<Vector2>>
+            initialPositions = new List<List<Vector2>>();
+            if (Controller.Instance.dataStruc.positionGroups != null)
+            {
+                foreach (var group in Controller.Instance.dataStruc.positionGroups)
+                {
+                    initialPositions.Add(group.points);
+                }
+            }
+        }
         else
             initialPositions.Clear();
 
@@ -104,6 +114,8 @@ public class ECPPSO : IOptimizer
             // Đánh giá fitness ban đầu
             Controller.Instance.Evaluate(p);
             p.pBest = new List<Vector2>(p.pos);
+
+            Controller.Instance.SetStationPositions(p.pBest);
             p.pBestFitness = p.fitness;
             population.Add(p);
         }
@@ -147,24 +159,22 @@ public class ECPPSO : IOptimizer
             Vector2 avoidance = Vector2.zero;
             if (Controller.Instance.useObstacles)
             {
-                // Find nearest obstacle edge and get avoidance direction
-                float minDist = float.MaxValue;
-                Vector2 bestNormal = Vector2.zero;
-                
+                // Tính lực đẩy từ tất cả các vật cản
                 foreach (var obs in Controller.Instance.Obstacles)
                 {
-                    float dist;
-                    Vector2 normal = obs.GetClosestEdgeNormal(p.pos[i], out dist);
-                    if (dist < minDist)
+                    if (obs == null) continue;
+                    
+                    float dist = Vector2.Distance(p.pos[i], obs.pos);
+                    float effectiveRange = obs.radius * 2f;
+                    
+                    if (dist < effectiveRange && dist > 0.01f)
                     {
-                        minDist = dist;
-                        bestNormal = normal;
+                        Vector2 dir = (p.pos[i] - obs.pos).normalized;
+                        // Lực đẩy tỷ lệ nghịch với khoảng cách (càng gần càng mạnh)
+                        float strength = Controller.Instance.delta * (1f - dist / effectiveRange);
+                        avoidance += dir * strength;
                     }
                 }
-                
-                
-                avoidance = Controller.Instance.delta * bestNormal;
-                
             }
 
             uri[i] /= (neighbors.Count() + 1f);
@@ -192,21 +202,8 @@ public class ECPPSO : IOptimizer
 
         if (Controller.Instance.useObstacles)
         {
-            int nearObs = 0;
-            foreach (var pos in p.pos)
-            {
-                foreach (var obs in Controller.Instance.Obstacles)
-                {
-                    float dist;
-                    obs.GetClosestEdgeNormal(pos, out dist);
-                    if (dist < Controller.Instance.avoidanceRange * radius)
-                    {
-                        nearObs++;
-                        break; // Count each position only once
-                    }
-                }
-            }
-            Fd -= Controller.Instance.epsilon * nearObs; // ε = 0.05
+            int nearObs = p.pos.Count(pos => Controller.Instance.Obstacles.Any(o => (pos - o.pos).magnitude < o.radius * 2f));
+            Fd -= Controller.Instance.epsilon * nearObs; // δ = 0.05
         }
 
         for (int i = 0; i < stationNum; i++)
@@ -277,28 +274,24 @@ public class ECPPSO : IOptimizer
                     newPos.y = Mathf.Clamp(newPos.y, -areaW / 2f, areaW / 2f);
                 }
 
-                p.vel[i] = v;
-                p.pos[i] = newPos;
-
-                // Check if position is inside obstacle and push out
+                 // Bật ra ngoài nếu vào vật cản
                 if (Controller.Instance.useObstacles)
                 {
                     foreach (var obs in Controller.Instance.Obstacles)
                     {
-                        if (obs.Contains(p.pos[i]))
+                        if (obs.Contains(newPos))
                         {
-                            float dist;
-                            Vector2 normal = obs.GetClosestEdgeNormal(p.pos[i], out dist);
-                            if (normal.sqrMagnitude < 1e-6f)
-                                normal = UnityEngine.Random.insideUnitCircle.normalized;
-                            
-                            // Push out along normal
-                            p.pos[i] += normal * (Controller.Instance.stationRadius + 0.2f);
-                            p.vel[i] *= -0.3f; // Bounce back with damping
-                            break;
+                            Vector2 dir = (newPos - obs.pos).normalized;
+                            newPos = obs.pos + dir * (obs.radius +0.5f);
+                            v *= 0.5f; // giảm tốc độ sau va chạm
                         }
                     }
                 }
+
+                p.vel[i] = v;
+                p.pos[i] = newPos;
+
+
             }
 
             Controller.Instance.Evaluate(p);

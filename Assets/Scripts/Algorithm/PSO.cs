@@ -43,8 +43,19 @@ public class PSO : IOptimizer
         vmax = radius;
 
         //  Load/Gen vị trí ban đầu
+        //  Load/Gen vị trí ban đầu
         if (Controller.Instance.testType == Controller.TestType.LoadInit)
-            initialPositions = Controller.Instance.LoadInitial();
+        {
+            // Chuyển đổi từ positionGroups sang List<List<Vector2>>
+            initialPositions = new List<List<Vector2>>();
+            if (Controller.Instance.dataStruc.positionGroups != null)
+            {
+                foreach (var group in Controller.Instance.dataStruc.positionGroups)
+                {
+                    initialPositions.Add(group.points);
+                }
+            }
+        }
         else
             initialPositions.Clear();
 
@@ -151,6 +162,19 @@ public class PSO : IOptimizer
                     newPos.y = Mathf.Clamp(newPos.y, -areaW / 2f, areaW / 2f);
                 }
 
+                // Bật ra ngoài nếu vào vật cản
+                if (Controller.Instance.useObstacles)
+                {
+                    foreach (var obs in Controller.Instance.Obstacles)
+                    {
+                        if (obs.Contains(newPos))
+                        {
+                            Vector2 dir = (newPos - obs.pos).normalized;
+                            newPos = obs.pos + dir * (obs.radius +0.5f);
+                            v *= 0.5f; // giảm tốc độ sau va chạm
+                        }
+                    }
+                }
 
                 p.vel[i] = v;
                 p.pos[i] = newPos;
@@ -165,7 +189,11 @@ public class PSO : IOptimizer
         var candidate = population.OrderByDescending(p => p.fitness).First();
         if (candidate.fitness > gBest.fitness)
         {
-            gBest = candidate;
+            // Deep copy để gBest không bị thay đổi khi candidate thay đổi
+            gBest.pos = new List<Vector2>(candidate.pos);
+            gBest.fitness = candidate.fitness;
+            gBest.pBest = new List<Vector2>(candidate.pBest);
+            gBest.pBestFitness = candidate.pBestFitness;
         }
 
         iteration++;
