@@ -237,27 +237,30 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   useObstacles: 1
   optimizerType: 1
-  testType: 1
+  testType: 0
+  initMode: 1
+  clusterCount: 5
+  minStationDistance: 8
   useGA: 0
   useSE: 1
   useNEP: 1
-  AutoSaveInitial: 1
-  filePath: Assets/Data/S100/data1_S100.json
-  SaveResults: 0
-  fitnessFilePath: 
+  AutoSaveInitial: 0
+  filePath: Assets/Data/S200/data1_S200.json
+  SaveResults: 1
+  fitnessFilePath: Assets/Data/S200/ResultData.csv
   SaveRunTimes: 0
-  RunTimeFilePath: 
-  totalRunTimeFilePath: 
+  RunTimeFilePath: Assets/Data/S200/RunTime.csv
+  totalRunTimeFilePath: Assets/Data/S200/TotalRunTime.csv
   stationPrefab: {fileID: 5092163109252927539, guid: 5ccd067dcbd1cd04ea2b72c3550a006c, type: 3}
-  areaL: 70
-  areaW: 70
-  station_num: 100
-  stationRadius: 5
+  areaL: 100
+  areaW: 100
+  station_num: 300
+  stationRadius: 4
   populationSize: 50
   maxIterations: 500
   w: 0.4
-  c1: 2
-  c2: 2
+  c1: 3
+  c2: 3
   G_percent: 15
   neighborCount: 3
   E_percent: 30
@@ -268,7 +271,7 @@ MonoBehaviour:
   obstacleCount: 8
   radiusRange: {x: 6, y: 10}
   avoidanceStrength: 0.4
-  avoidanceRange: 2
+  avoidanceRange: 1
   delta: 0.05
   epsilon: 0.05
   dataStruc:

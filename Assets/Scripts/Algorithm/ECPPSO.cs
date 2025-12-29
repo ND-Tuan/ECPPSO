@@ -73,41 +73,23 @@ public class ECPPSO : IOptimizer
 
             // Gán vị trí ban đầu
             if (Controller.Instance.testType == Controller.TestType.LoadInit)
-                p.pos = initialPositions[i];
+                p.pos = new List<Vector2>(initialPositions[i]); // Deep copy
             else
             {
-                for (int j = 0; j < stationNum; j++)
+                // Khởi tạo dựa trên initMode
+                switch (Controller.Instance.initMode)
                 {
-                    // random vị trí trong vùng
-                    Vector2 pos = new Vector2(Random.Range(-areaL / 2f, areaL / 2f), Random.Range(-areaW / 2f, areaW / 2f));
-
-                    if( Controller.Instance.Obstacles.Count == 0)
-                    {
-                        p.pos.Add(pos);
-                        continue;
-                    }
-
-                    bool insideObstacle;
-                    do
-                    {
-                        insideObstacle = false;
-                        pos = new Vector2(Random.Range(-areaL / 2f, areaL / 2f),
-                                        Random.Range(-areaW / 2f, areaW / 2f));
-
-                        foreach (var ob in Controller.Instance.Obstacles)
-                        {
-                            if (ob.Contains(pos))
-                            {
-                                insideObstacle = true;
-                                break;
-                            }
-                        }
-                    } while (insideObstacle);
-
-                    p.pos.Add(pos);
+                    case Controller.InitMode.Uniform:
+                        InitializationStrategy.InitializeUniform(p, stationNum, areaL, areaW);
+                        break;
+                    case Controller.InitMode.Clustered:
+                        InitializationStrategy.InitializeClustered(p, stationNum, areaL, areaW, radius);
+                        break;
+                    case Controller.InitMode.MinDistance:
+                        InitializationStrategy.InitializeMinDistance(p, stationNum, areaL, areaW);
+                        break;
                 }
-                    
-
+                
                 initialPositions.Add(p.pos);
             }
 
